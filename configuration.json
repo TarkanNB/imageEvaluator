@@ -17,7 +17,7 @@
 ## Default scale is the scale that will be shown for the images on the left of the webpage (the original image).
 ## If this is left blank then the original images, images will shown in program without scaling.
 >>>Default_scale:
-	$$			#options((Integer,Integer))
+	$200$		#options((Integer,Integer))
 
 # Rescaleability when enabled allows the evaluator to rescale the image with e slider displayed in the sidebar
 >>>Rescaleability:
@@ -37,5 +37,10 @@
 	$multiple_choice$  		#type of question.
 	$Is this a plaque?$		#discription of the question for the evaluator.
 	$is a plaque, could be a plaque, not a plaque, pass$ 	#posible answers that can be given.
+
+	$diffusion$
+	$multiple_choice$
+	$How diffuse is this plague$
+	$diffuse, somewhat diffuse, not diffuse, pass$
 
 >>>End_questions
