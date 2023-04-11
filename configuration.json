@@ -1,21 +1,21 @@
-### CONFIGURATION FILE
+## CONFIGURATION FILE ##
 
-## Configuration file for web_page_image_qestionaire.py program.
-## This file contains the information to modify:
-## 		the questions asked on the generated webpage,
-##		how to store the data from the respondents,
-##		and hotkey modifications.
+# Configuration file for web_page_image_qestionaire.py program.
+# This file contains the information to modify:
+# 		the questions asked on the generated webpage,
+#		how to store the data from the respondents,
+#		and hotkey modifications.
 
-## Rules for modification:
-## 		Lines starting with: #, ## or ### will be ignored when running the web_page_image_questionaire.py program.
-##		Lines starting with: >>> should not be modified.
-##		Input to the program is given inbetween two $ signs:  ($<Input to the program>$)
+# Rules for modification:
+# 		Lines starting with: #, ## or ### will be ignored when running the web_page_image_questionaire.py program.
+#		Lines starting with: >>> should not be modified.
+#		Input to the program is given inbetween two $ signs:  ($<Input to the program>$)
 
 
 ## IMAGE DISPLAY ##
 
-## Default scale is the scale that will be shown for the images on the left of the webpage (the original image).
-## If this is left blank then the original images, images will shown in program without scaling.
+# Default scale is the scale that will be shown for the images on the left of the webpage (the original image).
+# If this is left blank then the original images, images will shown in program without scaling.
 >>>Default_scale:
 	$200$		#options((Integer,Integer))
 
@@ -25,12 +25,12 @@
 
 
 ## QUESTIONS ##
-## 
-## questions have to be in the following form:
-##		$"name in database to store"$ 	#Input options: a string (names how to store the data in the database) 
-##		$"type of question"$  			#Input options: multiple_choice, selection_box or text_input.
-##		$"discription of the question"$ #Input options: a string
-##		$"option1,option2,option3,..."$	#Input options: an option is a string followed by a "," possible answer to the cwestion.
+ 
+# questions have to be in the following form:
+#		$"name in database to store"$ 	#Input options: a string (names how to store the data in the database) 
+#		$"type of question"$  			#Input options: multiple_choice, selection_box or text_input.
+#		$"discription of the question"$ #Input options: a string
+#		$"option1,option2,option3,..."$	#Input options: an option is a string followed by a "," possible answer to the cwestion.
 
 >>>Questions:
 	$identification$		#name in database.
