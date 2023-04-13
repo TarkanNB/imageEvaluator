@@ -1,16 +1,8 @@
-""" This module takes images from the imgage directory,
-    and shows them in a random order one by one on a webpage.
-    Were it will prompt the evaluator for questions as given in the configuration.json file.
-    It will store these responces in a datasheet after the last image has been shown. 
-"""
-
-from datetime import datetime
-import os
 import csv
 import random as rd
 from PIL import Image
 import streamlit as st
-import streamlit.components.v1 as components
+
 
 
 class Picture:
@@ -74,6 +66,10 @@ class Question:
             return st.radio(self.discription, self.options)
         elif self.type == "selection_box":
             return st.selectbox(self.discription, self.options)
+        elif self.type == "check_box":
+            return st.checkbox(self.discription, self.options)
+        else:
+            raise Exception("Error: wrong question type, see question types in configuration file.")
 
 
 @st.cache_data
@@ -97,7 +93,7 @@ def get_all_picture(type_selection=None):
     sample_name = ""
     types = []
     extension = ""
-    for name in images_log:
+    for name in sorted(images_log):
 
         # Check for correct format, 
         # and extract sample type and extention names for image class.
@@ -187,7 +183,7 @@ def get_configurations():
                         key += 1  # new unic key for next question
     return (configuration, questions)
 
-def create_datasheet(picture_class_seq, dict_image_id, evaluator_name, datasheet_name=None):
+def create_datasheet(picture_classes, dict_image_id, evaluator_name, datasheet_name=None):
     # make a data sheet in the current folder
     if not datasheet_name:
         # create a name for datasheet if none given
@@ -197,9 +193,9 @@ def create_datasheet(picture_class_seq, dict_image_id, evaluator_name, datasheet
         sheet = csv.writer(datasheet, dialect='unix')
         respons_category = [qest.name_in_database for qest in st.session_state.questions_to_ask]
         sheet.writerow(["image_name"] + respons_category + ["date", "name_evaluator"])
-        sheet.writerow([picture_class_seq[0].full_names, dict_image_id[picture_class_seq[0].full_names], time.strftime("%Y-%m-%d_%H-%M-%S"), evaluator_name])
-        for picture in picture_class[1:]:
-            sheet.writerow([picture.full_names, dict_image_id[picture.full_names]])
+        sheet.writerow([picture_classes[0].full_names] + dict_image_id[picture_classes[0].full_names] + [time.strftime("%Y-%m-%d_%H-%M-%S"), evaluator_name])
+        for picture in picture_classes[1:]:
+            sheet.writerow([picture.full_names] + dict_image_id[picture.full_names])
 
 
 ### --- initialization of session --- ###
@@ -228,9 +224,12 @@ if 'keep_identifying' not in st.session_state:
 
 ### --- Web page --- ###
 
-st.title("Identify the Brain tissue")
+st.title(st.session_state.configurations["Title"])
 
 if st.session_state.keep_identifying:
+    if st.session_state.configurations["Discription"]:
+        st.write(st.session_state.configurations["Discription"])
+
     responses = []
     with st.sidebar:
         for i, question in enumerate(st.session_state.questions_to_ask):
