@@ -10,6 +10,7 @@ import os
 import csv
 import random as rd
 import sqlite3
+import configparser
 from PIL import Image
 import streamlit as st
 import streamlit.components.v1 as components
@@ -146,70 +147,39 @@ def get_all_picture(type_selection=None):
     else:
         raise Exception("Error: could detect no picture files in local folder.")
 
-@st.cache_data
-def get_configurations():
-    # Returns a tuple with:
-    # [0]: all configuration variables from the configuration.json file as a dictionary,
-    # [1]: all questions in configuration.json file ass a list of Questions (class).
-    configuration = dict()
-    questions = []
-    question_variables = []
+def get_questions(configuration):
+    # takes all the questions discriptions from the configuration 
+    # and returns a list of Question classes 
+    questions_list = []
+    config = configuration.sections()
+    configurated_questions = config[config.index('QUESTIONS')+1 : config.index('End_questions')-1]
     key = 0  # unique key for each question.
-    reading_input = False
-    reading_question_input = False
-    with open("configuration.json", "r") as conf_file:
-        for line in conf_file:
-            # checks if the line has to be ignored.
-            if line[0] == "#" or line == "\n":
-                continue
-            # checks if a new variable needs to be declared.
-            elif line[0:3] == ">>>":
-                variable = line.split(">>>")[-1].split(":")[0]
-                # start reading questions from the configuration file.
-                if variable == "Questions":
-                    reading_question_input = True
-                # finished with the questions section of the configuration file.
-                elif variable == "End_questions\n":
-                    reading_question_input = False
-                else:
-                    reading_input = True  # start reading other variable from the file.
-            elif reading_input:
-                # bind value to declared variable
-                configuration[variable] = line.split("$")[1]
-                reading_input = False
-            elif reading_question_input:
-                # reading from questions section in file.
-                pre_variable = line.split("$")
-                if len(pre_variable) != 1:
-                    question_variables.append(pre_variable[1])
-                    if len(question_variables) == 3 and "text_input" in question_variables:
-                        # make a text_input question
-                        text_input_question = Question(
-                            key,
-                            question_variables[0],
-                            question_variables[1],
-                            question_variables[2]
-                            )
-                        questions.append(text_input_question)
-                        question_variables = []
-                        # new unique key for next question
-                        # , and to keep track of the input class for hotkey binding
-                        key += 1
-                    elif len(question_variables) == 4:
-                        # make an other question
-                        non_text_input_question = Question(
-                            key,
-                            question_variables[0],
-                            question_variables[1],
-                            question_variables[2],
-                            question_variables[3].strip(" ").strip("(").strip(")").strip(" ").split(",")
-                            )
-                        questions.append(non_text_input_question)
-                        question_variables = []
-                        # new unique key for next question
-                        # , and to keep track of the input for hotkey binding
-                        key += len(non_text_input_question.options)
-    return (configuration, questions)
+    for config_question in configurated_questions:
+        if configuration[config_question]['Question_type'] == 'text_input':
+            text_input_question = Question(
+                key,
+                config_question,
+                'text_input',
+                configuration[config_question]['Question_discription']
+                )
+            questions_list.append(text_input_question)
+            # new unique key for next question
+            # , and to keep track of the input for hotkey binding
+            key += 1
+        else:
+            # non text_input questions
+            question_class = Question(
+                key,
+                config_question,
+                configuration[config_question]['Question_type'],
+                configuration[config_question]['Question_discription'],
+                configuration[config_question]['Options'].strip(" ").split(",")
+                )
+            questions_list.append(question_class)
+            # new unique key for next question
+            # , and to keep track of the input for hotkey binding
+            key += len(question_class.options)        
+    return questions_list
 
 def get_input_to_hotkey_bindings(questions_sequence):
     # given a list of Questions it returns a map with the correct responce to each key
@@ -293,16 +263,16 @@ def create_datasheet(picture_class_seq, dict_image_id, evaluator_name, datasheet
 def db_table_naming_code(questions_sequence, table_options):
     # creates the tables to be inputed in the database file
     if table_options == "Full_name":
-        sqlit_code = "(image_name, "
+        sqlite_code = "(image_name, "
     elif table_options == "Only_sample":
-        sqlit_code = "(sample_name)"
-    elif table_options == "Sample_with_seprate_types":
-        sqlit_code = "(sample_name, types, "
+        sqlite_code = "(sample_name)"
+    elif table_options == "Sample_with_separate_types":
+        sqlite_code = "(sample_name, types, "
     else:
         raise Exception(f"Error:{table_options} is not a correct argument for Images_storage in configuration.json")
     for a_question in questions_sequence:
-        sqlit_code += a_question.name_in_database + ", "
-    return sqlit_code + "date, evaluators_name)"
+        sqlite_code += a_question.name_in_database + ", "
+    return sqlite_code + "date, evaluators_name)"
 
 def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evaluator):
     remaining_pictures = []
@@ -319,11 +289,15 @@ if 'image_to_id_dictionary' not in st.session_state:
     st.session_state.image_to_id_dictionary = dict()
 
 if 'configurations' not in st.session_state:
-    # dictionary with all the configurations without the questions
-    st.session_state.configurations = get_configurations()[0]
+    # Set configurations from configuration.ini file for this session
+    st.session_state.configurations = configparser.ConfigParser()
+    st.session_state.configurations.read('configuration.ini')
 
 if 'questions_to_ask' not in st.session_state:
-    st.session_state.questions_to_ask = get_configurations()[1]
+    # initialize the questions for this session
+    st.session_state.questions_to_ask = get_questions(
+        st.session_state.configurations) # list of Questions
+    # get the hotkey assosiated with each Question option
     st.session_state.hotkeys = get_input_to_hotkey_bindings(st.session_state.questions_to_ask)
     write_hotkey_configurations_html_file(st.session_state.hotkeys, 
         st.session_state.questions_to_ask)
@@ -337,7 +311,7 @@ if 'keep_identifying' not in st.session_state:
 # Create a SQLite database to store answers if there isn't any
 database_code = "CREATE TABLE IF NOT EXISTS answers " + db_table_naming_code(
     st.session_state.questions_to_ask,
-    st.session_state.configurations["Image_storing"])
+    st.session_state.configurations["DATABASE"]["Image_storing"])
 conn = sqlite3.connect('answers.db')
 cur = conn.cursor()
 cur.execute(database_code)
@@ -346,7 +320,7 @@ conn.commit()
 
 ### --- Web page --- ###
 
-st.title(st.session_state.configurations["Title"])
+st.title(st.session_state.configurations["TEXT"]['Title'])
 
 # Starting page for entering the evaluators name.
 if not st.session_state.name_entered:
@@ -375,8 +349,8 @@ if not st.session_state.name_entered:
 # Evaluation of current picture page.
 elif st.session_state.keep_identifying:
     # write a discription from the configuration file
-    if st.session_state.configurations["Discription"]:
-        st.write(st.session_state.configurations["Discription"])
+    if st.session_state.configurations["TEXT"]["Discription"]:
+        st.write(st.session_state.configurations["TEXT"]["Discription"])
 
     responses = []
     with st.sidebar:
@@ -385,10 +359,12 @@ elif st.session_state.keep_identifying:
             responses.append(question.ask())
             st.write(f"Selected: {responses[i].split('<')[0]}")
 
-        if st.session_state.configurations["Rescaleability"] == "Enable":
+        if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
             picture_slider = st.slider(
                 "image size (scale)",
-                1, 50, 1
+                1,
+                int(st.session_state.configurations['IMAGE_DISPLAY']['Max_scale']),
+                1
             )
 
         next_picture_button = st.button("Next_image")
@@ -398,7 +374,7 @@ elif st.session_state.keep_identifying:
             st.session_state.image_to_id_dictionary[current_picture.full_names] = remove_key_label(responses)
             
             # insert picture with responce in database
-            if st.session_state.configurations["Image_storing"] == "Sample_with_seprate_types":
+            if st.session_state.configurations["DATABASE"]["Image_storing"] == "Sample_with_separate_types":
                 first_part = [current_picture.sample, str(tuple(current_picture.types))]
             else:
                 first_part = [str(current_picture.full_names)]
@@ -435,11 +411,11 @@ elif st.session_state.keep_identifying:
                 st.write(variation[i])
                 st.session_state.current_picture.standard_show(
                     variation[i],
-                    st.session_state.configurations["Default_scale"]
+                    st.session_state.configurations['IMAGE_DISPLAY']["Default_scale"]
                     )
         
         # shows scaleable questions
-        if st.session_state.configurations["Rescaleability"] == "Enable":
+        if st.session_state.configurations['IMAGE_DISPLAY']["Rescaleability"] == "Enable":
             if picture_slider == 1:
                 st.write("original size")
             else:
