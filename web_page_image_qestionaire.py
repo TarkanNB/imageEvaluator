@@ -1,7 +1,8 @@
-""" This module takes images from the imgage directory,
+""" This program takes images from the imgage directory,
     and shows them in a random order one by one on a webpage.
-    Were it will prompt the evaluator for questions as given in the configuration.json file.
-    It will store these responces in a datasheet after the last image has been shown. 
+    Were it will ask the evaluator for questions for each image as given in the configuration.json file.
+    The evaluations for a image will be stored in an answer database whenever the evaluator clicks on the next image buton
+    finaly, it will store these responces in a datasheet after the last image has been shown. 
 """
 
 from datetime import datetime
@@ -31,6 +32,7 @@ class Picture:
         return img.size
 
     def standard_show(self, the_type, size_str):
+        # Displays a picture when called which has been scaled to the given size (size_str)
         path_to_image = "images/" + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         width, height = img.size
@@ -48,7 +50,7 @@ class Picture:
         st.image(new_img, output_format='png')
 
     def show(self, the_type, scale=1):
-        # rendes the image on the webpage with specified scale.
+        # Displays the image on the webpage with specified scale.
         path_to_image = "images/" + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         if scale == 1:
@@ -61,12 +63,12 @@ class Picture:
 
 class Question:
     def __init__(self, key, name_in_database, type_of_question, question_discription, possible_answers=None):
-        self.key = key
+        self.key = key # needs to be unique and be in correct order to input class index of streamlit generated html file
         self.name_in_database = name_in_database
         self.type = type_of_question
         self.discription = question_discription
         self.options = possible_answers
-
+        # hotkeys is a dictionary where a key points to a specific index of HTML input class
         self.hotkeys = dict()
         if possible_answers:
             for i, possible_ans in enumerate(possible_answers):
@@ -78,6 +80,7 @@ class Question:
                     self.hotkeys[self.key + i] = hotkey
 
     def ask(self):
+        # Displays the question with the possible answers/text box
         if self.type == "text_input":
             return st.text_input(self.discription)
         elif self.type == "multiple_choice":
@@ -145,12 +148,13 @@ def get_all_picture(type_selection=None):
 
 @st.cache_data
 def get_configurations():
-    # [0]: fetches all conciguration veriables from the configuration.json file and stores it in a dictionary,
-    # [1]: fetches all questions in configuration.json file and stores and stores them in a list of Questions(class).
+    # Returns a tuple with:
+    # [0]: all configuration variables from the configuration.json file as a dictionary,
+    # [1]: all questions in configuration.json file ass a list of Questions (class).
     configuration = dict()
     questions = []
     question_variables = []
-    key = 0  # unic key for each question.
+    key = 0  # unique key for each question.
     reading_input = False
     reading_question_input = False
     with open("configuration.json", "r") as conf_file:
@@ -188,7 +192,7 @@ def get_configurations():
                             )
                         questions.append(text_input_question)
                         question_variables = []
-                        # new unic key for next question
+                        # new unique key for next question
                         # , and to keep track of the input class for hotkey binding
                         key += 1
                     elif len(question_variables) == 4:
@@ -202,7 +206,7 @@ def get_configurations():
                             )
                         questions.append(non_text_input_question)
                         question_variables = []
-                        # new unic key for next question
+                        # new unique key for next question
                         # , and to keep track of the input for hotkey binding
                         key += len(non_text_input_question.options)
     return (configuration, questions)
@@ -215,7 +219,10 @@ def get_input_to_hotkey_bindings(questions_sequence):
     return option_to_hotkey
 
 def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence):
-    
+    # Writes a generated_hotkey.html file to modify the streamlit generated HTML file,
+    # to inject specific key bord listener (= hotkeys) 
+    # based on input class index from hotkeys_dict 
+    # to specific possible answers of the renderd questions (= input classes in HTML)  
     last_question = questions_sequence[-1]
 
     if last_question.options:
@@ -297,6 +304,14 @@ def db_table_naming_code(questions_sequence, table_options):
         sqlit_code += a_question.name_in_database + ", "
     return sqlit_code + "date, evaluators_name)"
 
+def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evaluator):
+    remaining_pictures = []
+    seen_sample_list = [row[0] for row in cursor_db.execute("SELECT sample_name, evaluators_name FROM " + database + " WHERE evaluators_name='" + name_of_evaluator + "'")]    
+    for picture in pictures:
+        if not picture.sample in seen_sample_list:
+            remaining_pictures.append(picture)
+    return remaining_pictures
+    
 
 ### --- initialization of session --- ###
 
@@ -313,25 +328,16 @@ if 'questions_to_ask' not in st.session_state:
     write_hotkey_configurations_html_file(st.session_state.hotkeys, 
         st.session_state.questions_to_ask)
 
-all_pictures = get_all_picture()
-
-if 'picture_seq' not in st.session_state:
-    # randomize the picture order
-    st.session_state.picture_seq = rd.sample(all_pictures, len(all_pictures))
-    st.session_state.number_of_pictures = len(st.session_state.picture_seq)
-    st.session_state.progress = 1
-if 'current_picture' not in st.session_state:
-    st.session_state.current_picture = st.session_state.picture_seq.pop()
-if 'keep_identifying' not in st.session_state:
-    st.session_state.keep_identifying = True
 if 'name_entered' not in st.session_state:
     st.session_state.name_entered = False
+
+if 'keep_identifying' not in st.session_state:
+    st.session_state.keep_identifying = True
 
 # Create a SQLite database to store answers if there isn't any
 database_code = "CREATE TABLE IF NOT EXISTS answers " + db_table_naming_code(
     st.session_state.questions_to_ask,
     st.session_state.configurations["Image_storing"])
-#st.write(database_code) # testing
 conn = sqlite3.connect('answers.db')
 cur = conn.cursor()
 cur.execute(database_code)
@@ -342,14 +348,31 @@ conn.commit()
 
 st.title(st.session_state.configurations["Title"])
 
+# Starting page for entering the evaluators name.
 if not st.session_state.name_entered:
     # get name from the evaluator
-    st.session_state.evaluaters_name = st.text_input("Enter your name.")
-    if st.session_state.evaluaters_name:
-        st.session_state.name_entered = True
+    evaluator = st.text_input("Enter your name.")
+    if evaluator:
+        st.session_state.evaluators_name = evaluator.strip(" ").lower()
+        to_evaluate_pictures = get_not_yet_evaluated_pictures(
+            get_all_picture(),
+            cur,
+            'answers',
+            st.session_state.evaluators_name
+            )
+        st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures))
+        st.session_state.number_of_pictures = len(st.session_state.picture_seq)
+        if st.session_state.number_of_pictures != 0:
+            # in case that there are still unevaluated images by the evaluator
+            st.session_state.current_picture = st.session_state.picture_seq.pop()
+            st.session_state.progress = 1
+            st.session_state.name_entered = True
+        else:
+            # stop the program if there are no images
+            st.session_state.keep_identifying = False
         st.experimental_rerun()
 
-
+# Evaluation of current picture page.
 elif st.session_state.keep_identifying:
     # write a discription from the configuration file
     if st.session_state.configurations["Discription"]:
@@ -384,7 +407,7 @@ elif st.session_state.keep_identifying:
                 first_part
                 + remove_key_label(responses) 
                 + [datetime.now().strftime("%Y-%m-%d"), 
-                st.session_state.evaluaters_name]
+                st.session_state.evaluators_name]
                 ))
             cur.execute("INSERT INTO answers VALUES " + database_input)
             conn.commit()
@@ -427,14 +450,15 @@ elif st.session_state.keep_identifying:
                     var,
                     picture_slider
                     )
-        
+
+# End page 
 else:
     # finished with identification #
-    st.subheader("All Brain tissues have been identified.")
+    st.subheader("All images have been identified.")
     conn.close()
-    create_datasheet(all_pictures,
+    create_datasheet(get_all_picture(),
         st.session_state.image_to_id_dictionary,
-        st.session_state.evaluaters_name)
+        st.session_state.evaluators_name)
     st.write("evaluation submitted")
 
 ### information for development.
@@ -464,9 +488,9 @@ st.write(str(st.session_state.image_to_id_dictionary))
 st.write(st.session_state.hotkeys)
 ''
 'evaluator'
-st.write(st.session_state.evaluaters_name)
+st.write(st.session_state.evaluators_name)
 
-# Enable the hotkeys via the generated_hotkey file
+# Enable the hotkeys via the generated_hotkey.html file
 components.html(
             read_html(),
             height=0,
