@@ -1,0 +1,42 @@
+<script>
+    const streamlitDoc = window.parent.document;
+    
+    buttons = Array.from(streamlitDoc.querySelectorAll(".stButton > button"));
+    console.log(buttons);
+    answers = Array.from(streamlitDoc.querySelectorAll("input"));
+    console.log(answers);
+
+    const next_picture = buttons.find((e1) => e1.innerText === "Next_image");
+    const answer0 = answers[0];const answer1 = answers[1];const answer2 = answers[2];const answer3 = answers[3];const answer4 = answers[4];const answer5 = answers[5];const answer6 = answers[6];const answer7 = answers[7];streamlitDoc.addEventListener("keypress", function (e) {
+        switch(e.key) {
+            case "Enter":
+                next_picture.click();
+                break;
+        case "1": 
+answer0.click(); 
+break; 
+case "2": 
+answer1.click(); 
+break; 
+case "3": 
+answer2.click(); 
+break; 
+case "4": 
+answer3.click(); 
+break; 
+case "5": 
+answer4.click(); 
+break; 
+case "6": 
+answer5.click(); 
+break; 
+case "7": 
+answer6.click(); 
+break; 
+case "8": 
+answer7.click(); 
+break; 
+        }
+        });
+        </script>
+        
