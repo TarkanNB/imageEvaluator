@@ -18,7 +18,7 @@ In the configurations.ini file add your questions under [Questions] and above [E
   Question_discription = selectionbox question
   Options = option1, option2, option3
 ```
-Or bind a hotkey an answer by adding <'keystroke> after an option in Options
+Or bind a hotkey to an answer by adding <'keystroke> after an option in Options
 ```ini
   [question2]
   Question_type = multiple_choice
