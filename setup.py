@@ -12,7 +12,7 @@ long_discription = """
 
 setup(
     name='image_questionaire',
-    version="0.0.1",
+    version="0.1.0-alpha",
     discription='Framwork to help in the workflow of evaluating images',
     author='Tarkan Bilgic',
     author_email='tarkan.bilgicpub@gmail.com',
