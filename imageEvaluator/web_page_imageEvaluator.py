@@ -195,7 +195,7 @@ def get_input_to_hotkey_bindings(questions_sequence):
         option_to_hotkey.update(question.hotkeys)
     return option_to_hotkey
 
-def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence):
+def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next_image_button_hotkey):
     # Writes a generated_hotkey.html file to modify the streamlit generated HTML file,
     # to inject specific key bord listener (= hotkeys) 
     # based on input class index from hotkeys_dict 
@@ -219,7 +219,7 @@ def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence):
     """
     html_file_middle = """streamlitDoc.addEventListener("keypress", function (e) {
         switch(e.key) {
-            case "Enter":
+            case '""" + next_image_button_hotkey + """':
                 next_picture.click();
                 break;
         """
@@ -309,8 +309,11 @@ if 'questions_to_ask' not in st.session_state:
         st.session_state.configurations) # list of Questions
     # get the hotkey assosiated with each Question option
     st.session_state.hotkeys = get_input_to_hotkey_bindings(st.session_state.questions_to_ask)
-    write_hotkey_configurations_html_file(st.session_state.hotkeys, 
-        st.session_state.questions_to_ask)
+    write_hotkey_configurations_html_file(
+        st.session_state.hotkeys, 
+        st.session_state.questions_to_ask,
+        st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"]
+        )
 
 if 'name_entered' not in st.session_state:
     st.session_state.name_entered = False
@@ -421,7 +424,8 @@ elif st.session_state.keep_identifying:
             if st.session_state.progress > st.session_state.number_of_pictures:
                 st.session_state.keep_identifying = False
                 st.experimental_rerun()
-        st.write("<Enter>")
+        button_hotkey_str = st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"]
+        st.write(f"<{button_hotkey_str}>")
 
     with st.container():
         st.write(f"(image {st.session_state.progress} of {st.session_state.number_of_pictures} images)")
