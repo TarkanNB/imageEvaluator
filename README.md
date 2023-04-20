@@ -32,7 +32,7 @@ In the configurations.ini file other adjustments can be done,
 like image_display and database storage
 
 ### When Done:
-when images, guestions and other adjustments are made run following streamlit command:
+when images, questions and other adjustments are made run following streamlit command to render webpage:
 ```bash
 streamlit run web_page_image_qestionaire.py
 ```
