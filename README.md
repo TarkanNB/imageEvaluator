@@ -24,6 +24,7 @@ Or add to add hotkeys add <'keystroke> after an option in Options
   Question_type = multiple_choice
   Question_discription = multiple_choice_question
   Options = option1 <1>, option2 <2>, option3 <3>
+[End_questions]
 ```
 ### Further Configurate:
 In the configurations.ini file other adjustments can be done,
