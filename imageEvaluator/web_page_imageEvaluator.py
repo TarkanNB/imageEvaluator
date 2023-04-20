@@ -1,8 +1,8 @@
-""" This program takes images from the imgage directory,
+""" This program takes images from the images directory,
     and shows them in a random order one by one on a webpage.
-    Were it will ask the evaluator for questions for each image as given in the configuration.json file.
+    Were it will ask the evaluator for questions for each image as given in the configuration.ini file.
     The evaluations for a image will be stored in an answer database whenever the evaluator clicks on the next image buton
-    finaly, it will store these responces in a datasheet after the last image has been shown. 
+    finaly, it will store these responses in a datasheet after the last image has been shown. 
 """
 
 from datetime import datetime
@@ -15,6 +15,7 @@ from PIL import Image
 import streamlit as st
 import streamlit.components.v1 as components
 
+###################################################################
 
 class Picture:
     def __init__(self, sample_name, types, extension):
@@ -152,7 +153,7 @@ def get_questions(configuration):
     # and returns a list of Question classes 
     questions_list = []
     config = configuration.sections()
-    configurated_questions = config[config.index('QUESTIONS')+1 : config.index('End_questions')-1]
+    configurated_questions = config[config.index('QUESTIONS')+1 : config.index('End_questions')]
     key = 0  # unique key for each question.
     for config_question in configurated_questions:
         if configuration[config_question]['Question_type'] == 'text_input':
@@ -178,7 +179,10 @@ def get_questions(configuration):
             questions_list.append(question_class)
             # new unique key for next question
             # , and to keep track of the input for hotkey binding
-            key += len(question_class.options)        
+            if configuration[config_question]['Question_type'] == "selection_box":
+                key += 1
+            else:
+                key += len(question_class.options)        
     return questions_list
 
 def get_input_to_hotkey_bindings(questions_sequence):
@@ -282,8 +286,11 @@ def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evalua
             remaining_pictures.append(picture)
     return remaining_pictures
     
+#############################################################
 
-### --- initialization of session --- ###
+### --- Initialization of session --- ###
+## Set the variables for this session
+##
 
 if 'image_to_id_dictionary' not in st.session_state:
     st.session_state.image_to_id_dictionary = dict()
@@ -317,8 +324,11 @@ cur = conn.cursor()
 cur.execute(database_code)
 conn.commit()
 
+##############################################################
 
 ### --- Web page --- ###
+## Rendering of the webpage
+##
 
 st.title(st.session_state.configurations["TEXT"]['Title'])
 
@@ -414,7 +424,7 @@ elif st.session_state.keep_identifying:
                     st.session_state.configurations['IMAGE_DISPLAY']["Default_scale"]
                     )
         
-        # shows scaleable questions
+        # shows scaleable images
         if st.session_state.configurations['IMAGE_DISPLAY']["Rescaleability"] == "Enable":
             if picture_slider == 1:
                 st.write("original size")
@@ -427,7 +437,7 @@ elif st.session_state.keep_identifying:
                     picture_slider
                     )
 
-# End page 
+# Ending page 
 else:
     # finished with identification #
     st.subheader("All images have been identified.")
@@ -437,34 +447,6 @@ else:
         st.session_state.evaluators_name)
     st.write("evaluation submitted")
 
-### information for development.
-
-''
-''
-''
-'Only for development'
-'Internal values:'
-''
-'questions'
-st.write(st.session_state.questions_to_ask[0].options)
-''
-'configurations'
-st.write(st.session_state.configurations)
-''
-'picture_seq:'
-st.write(str(st.session_state.picture_seq))
-''
-'number of pictures in this folder:'
-st.write(str(st.session_state.number_of_pictures))
-''
-'dictionary'
-st.write(str(st.session_state.image_to_id_dictionary))
-''
-'hotkeys'
-st.write(st.session_state.hotkeys)
-''
-'evaluator'
-st.write(st.session_state.evaluators_name)
 
 # Enable the hotkeys via the generated_hotkey.html file
 components.html(
