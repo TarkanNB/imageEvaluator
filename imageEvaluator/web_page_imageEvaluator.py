@@ -90,10 +90,13 @@ class Question:
         elif self.type == "selection_box":
             return st.selectbox(self.discription, self.options)
         elif self.type == "check_box":
-            return st.checkbox(self.discription, self.options)
+            checkbox_options = []
+            st.write(self.discription)
+            for k, option in enumerate(self.options):
+                checkbox_options.append(st.checkbox(option, key=self.key+k))
+            return checkbox_options
         else:
             raise Exception("Error: wrong question type, see question types in configuration file.")
-
 
 @st.cache_data
 def get_the_path_to_main_directory():
@@ -365,9 +368,13 @@ elif st.session_state.keep_identifying:
     responses = []
     with st.sidebar:
         # render questions
+        check_box_type_indexes = []
         for i, question in enumerate(st.session_state.questions_to_ask):
             responses.append(question.ask())
-            st.write(f"Selected: {responses[i].split('<')[0]}")
+            if question.type != 'check_box':
+                st.write(f"Selected: {responses[i].split('<')[0]}")
+            else:
+                check_box_type_indexes.append(i)
 
         if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
             picture_slider = st.slider(
@@ -380,6 +387,15 @@ elif st.session_state.keep_identifying:
         next_picture_button = st.button("Next_image")
         if next_picture_button:
             current_picture = st.session_state.current_picture
+            for i in check_box_type_indexes:
+                check_box_responses = ""
+                for ii, check in enumerate(responses[i]):
+                    if check:
+                        if check_box_responses:
+                            check_box_responses += ","
+                        check_box_responses += st.session_state.questions_to_ask[i].options[ii].split("<")[0].strip()
+                responses[i] = check_box_responses
+
             # couple responce (<chosen_id>) to the current_picture
             st.session_state.image_to_id_dictionary[current_picture.full_names] = remove_key_label(responses)
             
@@ -388,7 +404,6 @@ elif st.session_state.keep_identifying:
                 first_part = [current_picture.sample, str(tuple(current_picture.types))]
             else:
                 first_part = [str(current_picture.full_names)]
-
             database_input = str(tuple(
                 first_part
                 + remove_key_label(responses) 
@@ -446,7 +461,7 @@ else:
         st.session_state.image_to_id_dictionary,
         st.session_state.evaluators_name)
     st.write("evaluation submitted")
-
+    
 
 # Enable the hotkeys via the generated_hotkey.html file
 components.html(
