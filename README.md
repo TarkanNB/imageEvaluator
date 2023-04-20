@@ -20,10 +20,10 @@ In the configurations.ini file add your questions under [Questions] and above [E
 ```
 Or add to add hotkeys add <'keystroke> after an option in Options
 ```ini
-    [question2]
-    Question_type = multiple_choice
-    Question_discription = multiple_choice_question
-    Options = option1 <1>, option2 <2>, option3 <3>
+  [question2]
+  Question_type = multiple_choice
+  Question_discription = multiple_choice_question
+  Options = option1 <1>, option2 <2>, option3 <3>
 ```
 ### Further Configurate:
 In the configurations.ini file other adjustments can be done,
