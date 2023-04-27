@@ -1,42 +1,91 @@
 <script>
+    // imageEvaluator program generated code for enabling hotkeys from configuration.ini file.
     const streamlitDoc = window.parent.document;
     
     buttons = Array.from(streamlitDoc.querySelectorAll(".stButton > button"));
     console.log(buttons);
     answers = Array.from(streamlitDoc.querySelectorAll("input"));
     console.log(answers);
-
+    var questions_input = [false,false]
+    checker = arr => arr.every(v => v === true);
+    
     const next_picture = buttons.find((e1) => e1.innerText === "Next_image");
-    const answer0 = answers[0];const answer1 = answers[1];const answer2 = answers[2];const answer3 = answers[3];const answer4 = answers[4];const answer5 = answers[5];const answer6 = answers[6];const answer7 = answers[7];streamlitDoc.addEventListener("keypress", function (e) {
+    const answer0 = answers[0];
+    const answer1 = answers[1];
+    const answer2 = answers[2];
+    const answer3 = answers[3];
+    const answer4 = answers[4];
+    const answer5 = answers[5];
+    const answer6 = answers[6];
+    const answer7 = answers[7];
+    const answer9 = answers[9];
+    const answer10 = answers[10];
+    const answer11 = answers[11];
+    
+    streamlitDoc.addEventListener("keypress", function (e) {
         switch(e.key) {
-            case "Enter":
+            case 'Enter':
+                questions_input = [false,false];
                 next_picture.click();
                 break;
-        case "1": 
-answer0.click(); 
-break; 
-case "2": 
-answer1.click(); 
-break; 
-case "3": 
-answer2.click(); 
-break; 
-case "4": 
-answer3.click(); 
-break; 
-case "5": 
-answer4.click(); 
-break; 
-case "6": 
-answer5.click(); 
-break; 
-case "7": 
-answer6.click(); 
-break; 
-case "8": 
-answer7.click(); 
-break; 
+            case "1": 
+                answer0.click(); 
+                questions_input[0] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "2": 
+                answer1.click(); 
+                questions_input[0] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "3": 
+                answer2.click(); 
+                questions_input[0] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "4": 
+                answer3.click(); 
+                questions_input[0] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "5": 
+                answer4.click(); 
+                questions_input[1] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "6": 
+                answer5.click(); 
+                questions_input[1] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "7": 
+                answer6.click(); 
+                questions_input[1] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "8": 
+                answer7.click(); 
+                questions_input[1] = true;
+                if (checker(questions_input)) {next_picture.click();
+                questions_input = [false,false];}
+                break; 
+            case "q": 
+                answer9.click(); 
+                break; 
+            case "s": 
+                answer10.click(); 
+                break; 
+            case "d": 
+                answer11.click(); 
+                break; 
         }
-        });
-        </script>
+    });
+</script>
         
