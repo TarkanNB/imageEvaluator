@@ -195,12 +195,23 @@ def get_input_to_hotkey_bindings(questions_sequence):
         option_to_hotkey.update(question.hotkeys)
     return option_to_hotkey
 
-def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next_image_button_hotkey):
+def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next_image_button_hotkey, workflow_config):
     # Writes a generated_hotkey.html file to modify the streamlit generated HTML file,
     # to inject specific key bord listener (= hotkeys) 
     # based on input class index from hotkeys_dict 
     # to specific possible answers of the renderd questions (= input classes in HTML)  
     last_question = questions_sequence[-1]
+
+    questions_input = '['
+    is_multiple_choice_question = dict()
+    input_region = 0
+    for q in questions_sequence:
+        if q.type == "multiple_choice":
+            for hotkey_input in list(q.hotkeys):
+                is_multiple_choice_question[hotkey_input] = input_region
+            questions_input += "false,"
+            input_region += 1
+    questions_input = questions_input.rstrip(',') + ']'
 
     if last_question.options:
         input_lenght = last_question.key + len(last_question.options)
@@ -214,12 +225,16 @@ def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next
     console.log(buttons);
     answers = Array.from(streamlitDoc.querySelectorAll("input"));
     console.log(answers);
+    """
 
+    html_file_button = f"var questions_input = {questions_input}" + """
+    checker = arr => arr.every(v => v === true);
     const next_picture = buttons.find((e1) => e1.innerText === "Next_image");
     """
     html_file_middle = """streamlitDoc.addEventListener("keypress", function (e) {
         switch(e.key) {
             case '""" + next_image_button_hotkey + """':
+                questions_input = """ + questions_input + """;
                 next_picture.click();
                 break;
         """
@@ -231,15 +246,21 @@ def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next
     bind_input = []
     with open("generated_hotkey.html", "w") as hotkey_file:
         hotkey_file.write(html_file_start)
+        hotkey_file.write(html_file_button)
         for i in range(input_lenght):
             if i in hotkeys_dict:
-                hotkey_file.write(f"const answer{i} = answers[{i}];")
+                hotkey_file.write(f"const answer{i} = answers[{i}];\n")
                 bind_input.append(i)
         hotkey_file.write(html_file_middle)
+
         for j in bind_input:
             explicit_hotkey_string = '"' + hotkeys_dict[j] + '"'
             hotkey_file.write(f"case {explicit_hotkey_string}: \n")
             hotkey_file.write(f"answer{j}.click(); \n")
+            if j in is_multiple_choice_question and workflow_config == "Enable":
+                hotkey_file.write(f"questions_input[{is_multiple_choice_question[j]}] = true;\n")
+                hotkey_file.write("if (checker(questions_input)) {next_picture.click();\n")
+                hotkey_file.write(f"questions_input = {questions_input};" + "}\n")
             hotkey_file.write("break; \n")
         hotkey_file.write(html_file_ending)
 
@@ -312,7 +333,8 @@ if 'questions_to_ask' not in st.session_state:
     write_hotkey_configurations_html_file(
         st.session_state.hotkeys, 
         st.session_state.questions_to_ask,
-        st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"]
+        st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"],
+        st.session_state.configurations["WORKFLOW"]["Change_image_after_choice_selection"]
         )
 
 if 'name_entered' not in st.session_state:
