@@ -11,12 +11,21 @@ import csv
 import random as rd
 import sqlite3
 import configparser
-from PIL import Image
+from PIL import Image, ImageEnhance
 import streamlit as st
 import streamlit.components.v1 as components
 
 ###################################################################
 
+def increase_brightness(image, brightness):
+    if image.mode not in ['L', 'RGB', 'RGBA']:
+        pre_image = image.convert('I')
+        img = pre_image.point(lambda i:i*(1./256)).convert('L')
+    else:
+        img = image
+    enhancer = ImageEnhance.Brightness(img)
+    return enhancer.enhance(brightness)
+        
 class Picture:
     def __init__(self, sample_name, types, extension):
         self.sample = sample_name   # string
@@ -33,7 +42,7 @@ class Picture:
         img = Image.open(self.full_names[0])
         return img.size
 
-    def standard_show(self, the_type, size_str):
+    def standard_show(self, the_type, size_str, brightness=1):
         # Displays a picture when called which has been scaled to the given size (size_str)
         path_to_image = "images/" + self.full_name_of[the_type]
         img = Image.open(path_to_image)
@@ -49,19 +58,28 @@ class Picture:
         else:
             raise Exception("Error: Could not interpret the Default scale in configuration file.")
         new_img = img.resize(image_size)
-        st.image(new_img, output_format='png')
+        if brightness == 1:
+            st.image(new_img, output_format='png')
+        else:
+            st.image(increase_brightness(new_img, brightness), output_format='png')
 
-    def show(self, the_type, scale=1):
+    def show(self, the_type, scale=1, brightness=1):
         # Displays the image on the webpage with specified scale.
         path_to_image = "images/" + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         if scale == 1:
-            st.image(img, output_format='png')
+            if brightness == 1:
+                st.image(img, output_format='png')
+            else:
+                st.image(increase_brightness(img, brightness), output_format='png')
         else:
             width, height = img.size
             image_size = (width * scale, height * scale)
             new_img = img.resize(image_size)
-            st.image(new_img, output_format='png')
+            if brightness == 1:
+                st.image(new_img, output_format='png')
+            else:
+                st.image(increase_brightness(new_img, brightness), output_format='png')
 
 class Question:
     def __init__(self, key, name_in_database, type_of_question, question_discription, possible_answers=None):
@@ -264,8 +282,8 @@ def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next
             hotkey_file.write("break; \n")
         hotkey_file.write(html_file_ending)
 
-def read_html():
-    with open("generated_hotkey.html") as file:
+def read_html(file_in_directory):
+    with open(file_in_directory) as file:
         return file.read()
 
 def remove_key_label(options_and_hotkey_list):
@@ -408,6 +426,15 @@ elif st.session_state.keep_identifying:
                 int(st.session_state.configurations['IMAGE_DISPLAY']['Max_scale']),
                 1
             )
+        
+        # slider to control the brightness of images
+        brightness_setting = st.slider(
+            "Brightness of images",
+            0.0,
+            float(st.session_state.configurations["IMAGE_DISPLAY"]['Max_Brightness']), 
+            float(st.session_state.configurations["IMAGE_DISPLAY"]['Default_Brightness']),
+            0.1
+            )
 
         next_picture_button = st.button("Next_image")
         if next_picture_button:
@@ -462,7 +489,8 @@ elif st.session_state.keep_identifying:
                 st.write(variation[i])
                 st.session_state.current_picture.standard_show(
                     variation[i],
-                    st.session_state.configurations['IMAGE_DISPLAY']["Default_scale"]
+                    st.session_state.configurations['IMAGE_DISPLAY']["Default_scale"],
+                    brightness_setting
                     )
         
         # shows scaleable images
@@ -475,7 +503,8 @@ elif st.session_state.keep_identifying:
                 st.write(var)
                 st.session_state.current_picture.show(
                     var,
-                    picture_slider
+                    picture_slider,
+                    brightness_setting
                     )
 
 # Ending page 
@@ -487,11 +516,11 @@ else:
         st.session_state.image_to_id_dictionary,
         st.session_state.evaluators_name)
     st.write("evaluation submitted")
-    
 
+ 
 # Enable the hotkeys via the generated_hotkey.html file
 components.html(
-            read_html(),
+            read_html("generated_hotkey.html"),
             height=0,
             width=0,
         )
