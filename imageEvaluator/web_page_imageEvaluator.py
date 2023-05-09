@@ -404,9 +404,9 @@ if not st.session_state.name_entered:
 
 # Evaluation of current picture page.
 elif st.session_state.keep_identifying:
-    # write a discription from the configuration file
-    if st.session_state.configurations["TEXT"]["Discription"]:
-        st.write(st.session_state.configurations["TEXT"]["Discription"])
+    # write a description from the configuration file
+    if st.session_state.configurations["TEXT"]["Description"]:
+        st.write(st.session_state.configurations["TEXT"]["Description"])
 
     responses = []
     with st.sidebar:
