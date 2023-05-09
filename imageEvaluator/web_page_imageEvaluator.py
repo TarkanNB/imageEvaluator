@@ -82,11 +82,11 @@ class Picture:
                 st.image(increase_brightness(new_img, brightness), output_format='png')
 
 class Question:
-    def __init__(self, key, name_in_database, type_of_question, question_discription, possible_answers=None):
+    def __init__(self, key, name_in_database, type_of_question, question_description, possible_answers=None):
         self.key = key # needs to be unique and be in correct order to input class index of streamlit generated html file
         self.name_in_database = name_in_database
         self.type = type_of_question
-        self.discription = question_discription
+        self.description = question_description
         self.options = possible_answers
         # hotkeys is a dictionary where a key points to a specific index of HTML input class
         self.hotkeys = dict()
@@ -102,14 +102,14 @@ class Question:
     def ask(self):
         # Displays the question with the possible answers/text box
         if self.type == "text_input":
-            return st.text_input(self.discription)
+            return st.text_input(self.description)
         elif self.type == "multiple_choice":
-            return st.radio(self.discription, self.options)
+            return st.radio(self.description, self.options)
         elif self.type == "selection_box":
-            return st.selectbox(self.discription, self.options)
+            return st.selectbox(self.description, self.options)
         elif self.type == "check_box":
             checkbox_options = []
-            st.write(self.discription)
+            st.write(self.description)
             for k, option in enumerate(self.options):
                 checkbox_options.append(st.checkbox(option, key=self.key+k))
             return checkbox_options
@@ -170,7 +170,7 @@ def get_all_picture(type_selection=None):
         raise Exception("Error: could detect no picture files in local folder.")
 
 def get_questions(configuration):
-    # takes all the questions discriptions from the configuration 
+    # takes all the questions descriptions from the configuration 
     # and returns a list of Question classes 
     questions_list = []
     config = configuration.sections()
@@ -182,7 +182,7 @@ def get_questions(configuration):
                 key,
                 config_question,
                 'text_input',
-                configuration[config_question]['Question_discription']
+                configuration[config_question]['Question_description']
                 )
             questions_list.append(text_input_question)
             # new unique key for next question
@@ -194,7 +194,7 @@ def get_questions(configuration):
                 key,
                 config_question,
                 configuration[config_question]['Question_type'],
-                configuration[config_question]['Question_discription'],
+                configuration[config_question]['Question_description'],
                 configuration[config_question]['Options'].strip(" ").split(",")
                 )
             questions_list.append(question_class)
@@ -293,6 +293,8 @@ def remove_key_label(options_and_hotkey_list):
     return options_list
 
 def create_datasheet(picture_class_seq, dict_image_id, evaluator_name, datasheet_name=None):
+    if picture_class_seq == []:
+        return None
     # make a data sheet in the current folder
     if not datasheet_name:
         # create a name for datasheet if none given
@@ -315,7 +317,7 @@ def db_table_naming_code(questions_sequence, table_options):
     elif table_options == "Sample_with_separate_types":
         sqlite_code = "(sample_name, types, "
     else:
-        raise Exception(f"Error:{table_options} is not a correct argument for Images_storage in configuration.json")
+        raise Exception(f"Error:{table_options} is not a correct argument for Images_storage in configuration.ini")
     for a_question in questions_sequence:
         sqlite_code += a_question.name_in_database + ", "
     return sqlite_code + "date, evaluators_name)"
@@ -362,10 +364,11 @@ if 'keep_identifying' not in st.session_state:
     st.session_state.keep_identifying = True
 
 # Create a SQLite database to store answers if there isn't any
-database_code = "CREATE TABLE IF NOT EXISTS answers " + db_table_naming_code(
+database_name = st.session_state.configurations["DATABASE"]["Database_name"]
+database_code = f"CREATE TABLE IF NOT EXISTS {database_name} " + db_table_naming_code(
     st.session_state.questions_to_ask,
     st.session_state.configurations["DATABASE"]["Image_storing"])
-conn = sqlite3.connect('answers.db')
+conn = sqlite3.connect(f'{database_name}.db')
 cur = conn.cursor()
 cur.execute(database_code)
 conn.commit()
@@ -373,7 +376,7 @@ conn.commit()
 ##############################################################
 
 ### --- Web page --- ###
-## Rendering of the webpage
+## Rendering of the web page
 ##
 
 st.title(st.session_state.configurations["TEXT"]['Title'])
@@ -387,19 +390,20 @@ if not st.session_state.name_entered:
         to_evaluate_pictures = get_not_yet_evaluated_pictures(
             get_all_picture(),
             cur,
-            'answers',
+            st.session_state.configurations["DATABASE"]["Database_name"],
             st.session_state.evaluators_name
             )
+        st.session_state.startOfSession_picture_seq = to_evaluate_pictures
         st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures))
         st.session_state.number_of_pictures = len(st.session_state.picture_seq)
         if st.session_state.number_of_pictures != 0:
             # in case that there are still unevaluated images by the evaluator
             st.session_state.current_picture = st.session_state.picture_seq.pop()
             st.session_state.progress = 1
-            st.session_state.name_entered = True
         else:
             # stop the program if there are no images
             st.session_state.keep_identifying = False
+        st.session_state.name_entered = True
         st.experimental_rerun()
 
 # Evaluation of current picture page.
@@ -462,7 +466,8 @@ elif st.session_state.keep_identifying:
                 + [datetime.now().strftime("%Y-%m-%d"), 
                 st.session_state.evaluators_name]
                 ))
-            cur.execute("INSERT INTO answers VALUES " + database_input)
+            database_name = st.session_state.configurations["DATABASE"]["Database_name"]
+            cur.execute(f"INSERT INTO {database_name} VALUES " + database_input)
             conn.commit()
 
             # change scope to new picture or go to #finished with identification
@@ -476,6 +481,7 @@ elif st.session_state.keep_identifying:
         button_hotkey_str = st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"]
         st.write(f"<{button_hotkey_str}>")
 
+    # rendering the images of the current_picture
     with st.container():
         st.write(f"(image {st.session_state.progress} of {st.session_state.number_of_pictures} images)")
         ''
@@ -512,12 +518,14 @@ else:
     # finished with identification #
     st.subheader("All images have been identified.")
     conn.close()
-    create_datasheet(get_all_picture(),
-        st.session_state.image_to_id_dictionary,
-        st.session_state.evaluators_name)
+    if st.session_state.configurations["DATABASE"]["Create_datasheet"] == "Enable":
+        create_datasheet(
+            st.session_state.startOfSession_picture_seq,
+            st.session_state.image_to_id_dictionary,
+            st.session_state.evaluators_name)
     st.write("evaluation submitted")
 
- 
+
 # Enable the hotkeys via the generated_hotkey.html file
 components.html(
             read_html("generated_hotkey.html"),
