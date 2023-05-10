@@ -27,7 +27,7 @@ def increase_brightness(image, brightness):
     return enhancer.enhance(brightness)
         
 class Picture:
-    def __init__(self, sample_name, types, extension):
+    def __init__(self, sample_name, types, extension, image_directory):
         self.sample = sample_name   # string
         self.types = types   # list of str
         self.full_name_of = dict()
@@ -37,14 +37,15 @@ class Picture:
             self.full_names.append(full_name)
             self.full_name_of[t] = full_name
         self.full_names = tuple(self.full_names)
+        self.image_directory = image_directory 
 
     def true_size(self):
         img = Image.open(self.full_names[0])
         return img.size
 
     def standard_show(self, the_type, size_str, brightness=1):
-        # Displays a picture when called which has been scaled to the given size (size_str)
-        path_to_image = "images/" + self.full_name_of[the_type]
+        # Displays a picture when called which has been scaled to the given size (size_str) and with given brightness factor
+        path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         width, height = img.size
         size = size_str.strip(" ").strip("(").strip(")").strip(" ").split(",")
@@ -64,8 +65,8 @@ class Picture:
             st.image(increase_brightness(new_img, brightness), output_format='png')
 
     def show(self, the_type, scale=1, brightness=1):
-        # Displays the image on the webpage with specified scale.
-        path_to_image = "images/" + self.full_name_of[the_type]
+        # Displays the image on the webpage with specified scale and brightness.
+        path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         if scale == 1:
             if brightness == 1:
@@ -116,7 +117,6 @@ class Question:
         else:
             raise Exception("Error: wrong question type, see question types in configuration file.")
 
-@st.cache_data
 def get_the_path_to_main_directory():
     # Get the path to current directory on linux systems.
     start_cmd = "pwd > path.txt"
@@ -129,9 +129,16 @@ def get_the_path_to_main_directory():
     return path
 
 @st.cache_data
-def get_all_picture(type_selection=None):
+def get_all_picture(path_to_images_directory=None):
+    # Get all  the images from images_directory and returns a list of Pictures
+    # (images get grouped by there sample_name in a Picture class)
+
     # Get the list of images in the images directory
-    images_log = os.listdir(get_the_path_to_main_directory() + '/images')
+    if path_to_images_directory:
+        images_log = os.listdir(path_to_images_directory)
+    else:
+        path_to_images_directory = './images'
+        images_log = os.listdir(get_the_path_to_main_directory() + '/images')
 
     pictures = []
     sample_name = ""
@@ -140,7 +147,7 @@ def get_all_picture(type_selection=None):
     for name in sorted(images_log):
 
         # Check for correct format, 
-        # and extract sample type and extention names for image class.
+        # and extract sample type and extention names for Picture class.
         sample_typeextension = name.split("__")
         if len(sample_typeextension) != 2:
             raise Exception(f"Error: could not read {name}, " 
@@ -157,7 +164,7 @@ def get_all_picture(type_selection=None):
         if sample_name == sample_typeextension[0]:
             types.append(type_extension[0])
         elif types:
-            pictures.append(Picture(sample_name, types, extension))
+            pictures.append(Picture(sample_name, types, extension, path_to_images_directory))
             sample_name = sample_typeextension[0]
             types = [type_extension[0]]
         else:
@@ -171,7 +178,7 @@ def get_all_picture(type_selection=None):
 
 def get_questions(configuration):
     # takes all the questions descriptions from the configuration 
-    # and returns a list of Question classes 
+    # and returns a list of Questions classes 
     questions_list = []
     config = configuration.sections()
     configurated_questions = config[config.index('QUESTIONS')+1 : config.index('End_questions')]
@@ -185,8 +192,8 @@ def get_questions(configuration):
                 configuration[config_question]['Question_description']
                 )
             questions_list.append(text_input_question)
-            # new unique key for next question
-            # , and to keep track of the input for hotkey binding
+            # new unique key for next question,
+            #  and to keep track of the input for hotkey binding
             key += 1
         else:
             # non text_input questions
@@ -198,8 +205,8 @@ def get_questions(configuration):
                 configuration[config_question]['Options'].strip(" ").split(",")
                 )
             questions_list.append(question_class)
-            # new unique key for next question
-            # , and to keep track of the input for hotkey binding
+            # new unique key for next question,
+            #  and to keep track of the input for hotkey binding
             if configuration[config_question]['Question_type'] == "selection_box":
                 key += 1
             else:
@@ -311,20 +318,20 @@ def create_datasheet(picture_class_seq, dict_image_id, evaluator_name, datasheet
 def db_table_naming_code(questions_sequence, table_options):
     # creates the tables to be inputed in the database file
     if table_options == "Full_name":
-        sqlite_code = "(image_name, "
+        sqlite_code = "(id, "
     elif table_options == "Only_sample":
-        sqlite_code = "(sample_name)"
+        sqlite_code = "(id, "
     elif table_options == "Sample_with_separate_types":
-        sqlite_code = "(sample_name, types, "
+        sqlite_code = "(id, types, "
     else:
-        raise Exception(f"Error:{table_options} is not a correct argument for Images_storage in configuration.ini")
-    for a_question in questions_sequence:
-        sqlite_code += a_question.name_in_database + ", "
+        raise Exception(f"Error: {table_options} is not a correct argument for Images_storage in configuration.ini")
+    for quest in questions_sequence:
+        sqlite_code += quest.name_in_database + ", "
     return sqlite_code + "date, evaluators_name)"
 
 def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evaluator):
     remaining_pictures = []
-    seen_sample_list = [row[0] for row in cursor_db.execute("SELECT sample_name, evaluators_name FROM " + database + " WHERE evaluators_name='" + name_of_evaluator + "'")]    
+    seen_sample_list = [row[0] for row in cursor_db.execute("SELECT id, evaluators_name FROM " + database + " WHERE evaluators_name='" + name_of_evaluator + "'")]    
     for picture in pictures:
         if not picture.sample in seen_sample_list:
             remaining_pictures.append(picture)
@@ -383,12 +390,15 @@ st.title(st.session_state.configurations["TEXT"]['Title'])
 
 # Starting page for entering the evaluators name.
 if not st.session_state.name_entered:
+    if st.session_state.configurations["TEXT"]["Start_Description"]:
+        st.write(st.session_state.configurations["TEXT"]["Start_Description"])
+    
     # get name from the evaluator
     evaluator = st.text_input("Enter your name.")
     if evaluator:
         st.session_state.evaluators_name = evaluator.strip(" ").lower()
         to_evaluate_pictures = get_not_yet_evaluated_pictures(
-            get_all_picture(),
+            get_all_picture(st.session_state.configurations["IMAGE_DISPLAY"]["Images_folder"]),
             cur,
             st.session_state.configurations["DATABASE"]["Database_name"],
             st.session_state.evaluators_name
@@ -409,8 +419,8 @@ if not st.session_state.name_entered:
 # Evaluation of current picture page.
 elif st.session_state.keep_identifying:
     # write a description from the configuration file
-    if st.session_state.configurations["TEXT"]["Description"]:
-        st.write(st.session_state.configurations["TEXT"]["Description"])
+    if st.session_state.configurations["TEXT"]["Middle_Description"]:
+        st.write(st.session_state.configurations["TEXT"]["Middle_Description"])
 
     responses = []
     with st.sidebar:
@@ -516,14 +526,13 @@ elif st.session_state.keep_identifying:
 # Ending page 
 else:
     # finished with identification #
-    st.subheader("All images have been identified.")
+    st.subheader(st.session_state.configurations["TEXT"]["End_Description"])
     conn.close()
     if st.session_state.configurations["DATABASE"]["Create_datasheet"] == "Enable":
         create_datasheet(
             st.session_state.startOfSession_picture_seq,
             st.session_state.image_to_id_dictionary,
             st.session_state.evaluators_name)
-    st.write("evaluation submitted")
 
 
 # Enable the hotkeys via the generated_hotkey.html file
