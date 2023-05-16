@@ -117,6 +117,7 @@ class Question:
         else:
             raise Exception("Error: wrong question type, see question types in configuration file.")
 
+@st.cache_data
 def get_the_path_to_main_directory():
     # Get the path to current directory on linux systems.
     start_cmd = "pwd > path.txt"
@@ -127,6 +128,15 @@ def get_the_path_to_main_directory():
     end_cmd = "rm path.txt"
     os.system(end_cmd)
     return path
+
+def get_questionnaires_options():
+    # Get all the possible questionnaires in imageEvaluator/data folder, 
+    # and return a dictionairy with items option : path_to_folder_of_option
+    questionnaires = dict()
+    options = os.listdir(get_the_path_to_main_directory() + '/data')
+    for option in options:
+        questionnaires[option] = get_the_path_to_main_directory() + f"/data/{option}"
+    return questionnaires 
 
 @st.cache_data
 def get_all_picture(path_to_images_directory=None):
@@ -329,6 +339,18 @@ def db_table_naming_code(questions_sequence, table_options):
         sqlite_code += quest.name_in_database + ", "
     return sqlite_code + "date, evaluators_name)"
 
+def create_database(configuration, path_to_database_folder):
+    # Create a SQLite database to store answers if there isn't any
+    database_name = path_to_database_folder.split('/')[-1]
+    database_code = f"CREATE TABLE IF NOT EXISTS {database_name} " + db_table_naming_code(
+        get_questions(configuration),
+        configuration["DATABASE"]["Image_storing"])
+    conn = sqlite3.connect(f'{path_to_database_folder}/{database_name}.db')
+    c = conn.cursor()
+    c.execute(database_code)
+    conn.commit()
+    return (c, conn, database_name)
+
 def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evaluator):
     remaining_pictures = []
     seen_sample_list = [row[0] for row in cursor_db.execute("SELECT id, evaluators_name FROM " + database + " WHERE evaluators_name='" + name_of_evaluator + "'")]    
@@ -336,6 +358,7 @@ def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evalua
         if not picture.sample in seen_sample_list:
             remaining_pictures.append(picture)
     return remaining_pictures
+
     
 #############################################################
 
@@ -349,20 +372,6 @@ if 'image_to_id_dictionary' not in st.session_state:
 if 'configurations' not in st.session_state:
     # Set configurations from configuration.ini file for this session
     st.session_state.configurations = configparser.ConfigParser()
-    st.session_state.configurations.read('configuration.ini')
-
-if 'questions_to_ask' not in st.session_state:
-    # initialize the questions for this session
-    st.session_state.questions_to_ask = get_questions(
-        st.session_state.configurations) # list of Questions
-    # get the hotkey assosiated with each Question option
-    st.session_state.hotkeys = get_input_to_hotkey_bindings(st.session_state.questions_to_ask)
-    write_hotkey_configurations_html_file(
-        st.session_state.hotkeys, 
-        st.session_state.questions_to_ask,
-        st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"],
-        st.session_state.configurations["WORKFLOW"]["Change_image_after_choice_selection"]
-        )
 
 if 'name_entered' not in st.session_state:
     st.session_state.name_entered = False
@@ -370,15 +379,9 @@ if 'name_entered' not in st.session_state:
 if 'keep_identifying' not in st.session_state:
     st.session_state.keep_identifying = True
 
-# Create a SQLite database to store answers if there isn't any
-database_name = st.session_state.configurations["DATABASE"]["Database_name"]
-database_code = f"CREATE TABLE IF NOT EXISTS {database_name} " + db_table_naming_code(
-    st.session_state.questions_to_ask,
-    st.session_state.configurations["DATABASE"]["Image_storing"])
-conn = sqlite3.connect(f'{database_name}.db')
-cur = conn.cursor()
-cur.execute(database_code)
-conn.commit()
+if 'slider_key' not in st.session_state:
+    st.session_state.slider_key = 0
+
 
 ##############################################################
 
@@ -386,38 +389,64 @@ conn.commit()
 ## Rendering of the web page
 ##
 
-st.title(st.session_state.configurations["TEXT"]['Title'])
 
 # Starting page for entering the evaluators name.
 if not st.session_state.name_entered:
-    if st.session_state.configurations["TEXT"]["Start_Description"]:
-        st.write(st.session_state.configurations["TEXT"]["Start_Description"])
-    
-    # get name from the evaluator
-    evaluator = st.text_input("Enter your name.")
-    if evaluator:
-        st.session_state.evaluators_name = evaluator.strip(" ").lower()
-        to_evaluate_pictures = get_not_yet_evaluated_pictures(
-            get_all_picture(st.session_state.configurations["IMAGE_DISPLAY"]["Images_folder"]),
-            cur,
-            st.session_state.configurations["DATABASE"]["Database_name"],
-            st.session_state.evaluators_name
-            )
-        st.session_state.startOfSession_picture_seq = to_evaluate_pictures
-        st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures))
-        st.session_state.number_of_pictures = len(st.session_state.picture_seq)
-        if st.session_state.number_of_pictures != 0:
-            # in case that there are still unevaluated images by the evaluator
-            st.session_state.current_picture = st.session_state.picture_seq.pop()
-            st.session_state.progress = 1
-        else:
-            # stop the program if there are no images
-            st.session_state.keep_identifying = False
-        st.session_state.name_entered = True
-        st.experimental_rerun()
+    temporary_config = configparser.ConfigParser()
+    questionnaires_options = get_questionnaires_options()
+    if len(questionnaires_options) == 0:
+        raise Exception("No options for the evaluator")
+    elif len(questionnaires_options) == 1:
+        selected_questionnaire = list(questionnaires_options)[0]
+    else:
+        selected_questionnaire = st.selectbox("Select which images to evaluate", list(questionnaires_options))
+
+    if selected_questionnaire:
+        path_to_questionnaire = questionnaires_options[selected_questionnaire]
+        temporary_config.read(path_to_questionnaire + "/configuration.ini")
+        st.write(temporary_config["TEXT"]["Start_Description"])
+
+        # get name from the evaluator
+        evaluator = st.text_input(f"Enter your name to start evaluating the images of {selected_questionnaire} questionnaire.")
+        if evaluator:
+            st.session_state.evaluators_name = evaluator.strip(" ").lower()
+            database = create_database(
+                temporary_config,
+                questionnaires_options[selected_questionnaire]
+                )
+            to_evaluate_pictures = get_not_yet_evaluated_pictures(
+                get_all_picture(questionnaires_options[selected_questionnaire] + "/images"),
+                database[0],
+                database[2],
+                evaluator
+                )
+            if len(to_evaluate_pictures) != 0:
+                # in case that there are still unevaluated images by the evaluator
+                st.session_state.progress = 1
+                st.session_state.name_entered = True
+                st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures))
+                st.session_state.startOfSession_picture_seq = st.session_state.picture_seq
+                st.session_state.number_of_pictures = len(to_evaluate_pictures)
+                st.session_state.current_picture = st.session_state.picture_seq.pop()
+                st.session_state.configurations = temporary_config
+                st.session_state.questions_to_ask = get_questions(st.session_state.configurations)
+                st.session_state.path_to_questionnaire = questionnaires_options[selected_questionnaire]
+                st.session_state.hotkeys = get_input_to_hotkey_bindings(st.session_state.questions_to_ask)
+                write_hotkey_configurations_html_file(
+                    st.session_state.hotkeys, 
+                    st.session_state.questions_to_ask,
+                    st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"],
+                    st.session_state.configurations["WORKFLOW"]["Change_image_after_choice_selection"]
+                    )
+                st.experimental_rerun()
+            else:
+                # stop the program if there are no images
+                st.write(f"All available images in {selected_questionnaire} have already been evaluated by {evaluator}.")
+            
 
 # Evaluation of current picture page.
 elif st.session_state.keep_identifying:
+    st.title(st.session_state.configurations["TEXT"]['Title'])
     # write a description from the configuration file
     if st.session_state.configurations["TEXT"]["Middle_Description"]:
         st.write(st.session_state.configurations["TEXT"]["Middle_Description"])
@@ -432,14 +461,6 @@ elif st.session_state.keep_identifying:
                 st.write(f"Selected: {responses[i].split('<')[0]}")
             else:
                 check_box_type_indexes.append(i)
-
-        if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
-            picture_slider = st.slider(
-                "image size (scale)",
-                1,
-                int(st.session_state.configurations['IMAGE_DISPLAY']['Max_scale']),
-                1
-            )
         
         # slider to control the brightness of images
         brightness_setting = st.slider(
@@ -447,11 +468,22 @@ elif st.session_state.keep_identifying:
             0.0,
             float(st.session_state.configurations["IMAGE_DISPLAY"]['Max_Brightness']), 
             float(st.session_state.configurations["IMAGE_DISPLAY"]['Default_Brightness']),
-            0.1
+            0.1,
+            key="slider"+str(st.session_state.slider_key)
+            )
+
+        if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
+            picture_slider = st.slider(
+                "image size (scale)",
+                1,
+                int(st.session_state.configurations['IMAGE_DISPLAY']['Max_scale']),
+                1,
+                key="slider"+str(st.session_state.slider_key+1)
             )
 
         next_picture_button = st.button("Next_image")
         if next_picture_button:
+            st.session_state.slider_key += 2
             current_picture = st.session_state.current_picture
             for i in check_box_type_indexes:
                 check_box_responses = ""
@@ -476,7 +508,10 @@ elif st.session_state.keep_identifying:
                 + [datetime.now().strftime("%Y-%m-%d"), 
                 st.session_state.evaluators_name]
                 ))
-            database_name = st.session_state.configurations["DATABASE"]["Database_name"]
+            
+            database_name = st.session_state.path_to_questionnaire.split('/')[-1]
+            conn = sqlite3.connect(st.session_state.path_to_questionnaire + f"/{database_name}.db")
+            cur = conn.cursor()
             cur.execute(f"INSERT INTO {database_name} VALUES " + database_input)
             conn.commit()
 
@@ -487,7 +522,7 @@ elif st.session_state.keep_identifying:
             # Ending the session if all pictures have passed
             if st.session_state.progress > st.session_state.number_of_pictures:
                 st.session_state.keep_identifying = False
-                st.experimental_rerun()
+            st.experimental_rerun()
         button_hotkey_str = st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"]
         st.write(f"<{button_hotkey_str}>")
 
@@ -527,7 +562,6 @@ elif st.session_state.keep_identifying:
 else:
     # finished with identification #
     st.subheader(st.session_state.configurations["TEXT"]["End_Description"])
-    conn.close()
     if st.session_state.configurations["DATABASE"]["Create_datasheet"] == "Enable":
         create_datasheet(
             st.session_state.startOfSession_picture_seq,
