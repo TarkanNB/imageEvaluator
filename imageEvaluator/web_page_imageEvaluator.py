@@ -27,20 +27,22 @@ def increase_brightness(image, brightness):
     return enhancer.enhance(brightness)
         
 class Picture:
+    # Grouping of images of the same sample
     def __init__(self, sample_name, types, extension, image_directory):
         self.sample = sample_name   # string
         self.types = types   # list of str
-        self.full_name_of = dict()
-        self.full_names = []
+        self.full_name_of = dict() # get file_name(string) of image of [specified type]
+        self.full_names = [] # get all image_file_names
         for t in types:
             full_name = sample_name + "__" + t + "." + extension
             self.full_names.append(full_name)
             self.full_name_of[t] = full_name
         self.full_names = tuple(self.full_names)
         self.image_directory = image_directory
-        self.defaults = dict()
+        self.defaults = dict() # default image display values
 
     def set_defaults(self, image_to_default_variable_map, configuration):
+        # initialaze defaults when there exists a standart default for one of the images in image_to_default_variable_map
         template_defaults = {
             'brightness' : 1.0,
             'size' : configuration["IMAGE_DISPLAY"]["Default_scale"],
@@ -94,7 +96,7 @@ class Picture:
                 st.image(increase_brightness(new_img, brightness), output_format='png')
     
     def show_broader_image(self, brightness=1):
-        # shows the broader image with an square where the images are extracted
+        # shows the broader image with an square where the images are located
         if self.defaults["broad_image"]:
             path_to_broad_image =self.image_directory + '/broad_images/' + self.defaults["broad_image"]
             img = Image.open(path_to_broad_image)
@@ -179,10 +181,10 @@ def get_all_picture(path_to_images_directory=None):
     for name in sorted(images_log):
         if name == "broad_images": # skip directory
             continue
-        # Check for correct format, 
-        # and extract sample type and extention names for Picture class.
+        
+        # Check for correct image_file format, 
+        # if correct format: extract sample type and extention names for Picture class.
         sample_typeextension = name.split("__")
-
         if len(sample_typeextension) != 2:
             raise Exception(f"Error: could not read {name}, " 
             + "image name has to have following form: {sample}___{type}.{extension} in the image folder")
@@ -248,6 +250,8 @@ def get_questions(configuration):
     return questions_list
 
 def get_default_image_value_mapping(path_to_questionnaire):
+    # Takes path to <folder_name>_images_default_values.csv file,
+    # and returns a python_dictionary with  
     default_value_map = dict()
     file = path_to_questionnaire + "/" + path_to_questionnaire.split("/")[-1] + "_images_default_values.csv"
     is_fst_row = True
@@ -281,7 +285,9 @@ def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next
     # based on input class index from hotkeys_dict 
     # to specific possible answers of the renderd questions (= input classes in HTML)  
     last_question = questions_sequence[-1]
-
+    
+    # make correct questions_input with lenght = number of multiple_choice_questions,
+    # and pressing of hotkey maps to correct questions_input index.
     questions_input = '['
     is_multiple_choice_question = dict()
     input_region = 0
@@ -397,6 +403,7 @@ def create_database(configuration, path_to_database_folder):
     return (c, conn, database_name)
 
 def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evaluator):
+    # returns all pictures that evaluator has not evaluated in the image folder.
     remaining_pictures = []
     seen_sample_list = [row[0] for row in cursor_db.execute("SELECT id, evaluators_name FROM " + database + " WHERE evaluators_name='" + name_of_evaluator + "'")]    
     for picture in pictures:
@@ -419,10 +426,10 @@ if 'configurations' not in st.session_state:
     st.session_state.configurations = configparser.ConfigParser()
 
 if 'name_entered' not in st.session_state:
-    st.session_state.name_entered = False
+    st.session_state.name_entered = False # switch for Starting web page
 
 if 'keep_identifying' not in st.session_state:
-    st.session_state.keep_identifying = True
+    st.session_state.keep_identifying = True # switch for picture evaluating web pages
 
 if 'slider_key' not in st.session_state:
     st.session_state.slider_key = 0
@@ -435,9 +442,11 @@ if 'slider_key' not in st.session_state:
 ##
 
 
-# Starting page for entering the evaluators name.
+# Starting web page for entering the evaluators name and choosing questionnaire.
 if not st.session_state.name_entered:
     temporary_config = configparser.ConfigParser()
+    
+    # let evaluator choose a questionnaire from available folders in imageEvaluator/data folder
     questionnaires_options = get_questionnaires_options()
     if len(questionnaires_options) == 0:
         raise Exception("No options for the evaluator")
@@ -466,22 +475,24 @@ if not st.session_state.name_entered:
                 evaluator
                 )
             if len(to_evaluate_pictures) != 0:
-                # in case that there are still unevaluated images by the evaluator
+                # In case that there are still unevaluated images by the evaluator:
+                # Initialize session_state variables for the evaluator chozen questionnaire
                 st.session_state.progress = 1
                 st.session_state.name_entered = True
                 st.session_state.configurations = temporary_config
-                # randomize the picture order
-                st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures))
+                st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures)) # randomize the picture order
                 update_default_settings(
                     st.session_state.picture_seq,
                     get_default_image_value_mapping(path_to_questionnaire),
                     temporary_config
-                    )
+                    ) # initialize image defaults for all picture classes in picture sequence
                 st.session_state.startOfSession_picture_seq = st.session_state.picture_seq
                 st.session_state.number_of_pictures = len(to_evaluate_pictures)
                 st.session_state.current_picture = st.session_state.picture_seq.pop()
                 st.session_state.questions_to_ask = get_questions(st.session_state.configurations)
                 st.session_state.path_to_questionnaire = path_to_questionnaire
+                
+                # write a HTML file for activating all extracted hotkeys from questions
                 st.session_state.hotkeys = get_input_to_hotkey_bindings(st.session_state.questions_to_ask)
                 write_hotkey_configurations_html_file(
                     st.session_state.hotkeys, 
@@ -489,13 +500,13 @@ if not st.session_state.name_entered:
                     st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"],
                     st.session_state.configurations["WORKFLOW"]["Change_image_after_choice_selection"]
                     )
-                st.experimental_rerun()
+                st.experimental_rerun() # reload web page (go to #Evaluation_of_current_picture_web_page)
             else:
-                # stop the program if there are no images
+                # in case there are no images to evaluate
                 st.write(f"All available images in {selected_questionnaire} have already been evaluated by {evaluator}.")
             
 
-# Evaluation of current picture page.
+# Evaluation of current picture web page.
 elif st.session_state.keep_identifying:
     st.title(st.session_state.configurations["TEXT"]['Title'])
     # write a description from the configuration file
@@ -524,6 +535,7 @@ elif st.session_state.keep_identifying:
             )
 
         if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
+            # slider to control the scale of bottom images
             picture_slider = st.slider(
                 "image size (scale)",
                 1,
@@ -534,7 +546,7 @@ elif st.session_state.keep_identifying:
 
         next_picture_button = st.button("Next_image")
         if next_picture_button:
-            st.session_state.slider_key += 2
+            st.session_state.slider_key += 2 # reset sliders
             current_picture = st.session_state.current_picture
             for i in check_box_type_indexes:
                 check_box_responses = ""
@@ -560,6 +572,7 @@ elif st.session_state.keep_identifying:
                 st.session_state.evaluators_name]
                 ))
             
+            # Connect with sqlit database and enter responce for picture 
             database_name = st.session_state.path_to_questionnaire.split('/')[-1]
             conn = sqlite3.connect(st.session_state.path_to_questionnaire + f"/{database_name}.db")
             cur = conn.cursor()
@@ -572,8 +585,8 @@ elif st.session_state.keep_identifying:
             st.session_state.progress += 1
             # Ending the session if all pictures have passed
             if st.session_state.progress > st.session_state.number_of_pictures:
-                st.session_state.keep_identifying = False
-            st.experimental_rerun()
+                st.session_state.keep_identifying = False  # stop rendering #Evaluation_of_current_picture_web_page
+            st.experimental_rerun()  # go to next web page
         button_hotkey_str = st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"]
         st.write(f"<{button_hotkey_str}>")
 
@@ -612,7 +625,7 @@ elif st.session_state.keep_identifying:
                     brightness_setting
                     )
 
-# Ending page 
+# Ending web page 
 else:
     # finished with identification #
     st.subheader(st.session_state.configurations["TEXT"]["End_Description"])
