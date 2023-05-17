@@ -11,7 +11,7 @@ import csv
 import random as rd
 import sqlite3
 import configparser
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageDraw
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -37,19 +37,30 @@ class Picture:
             self.full_names.append(full_name)
             self.full_name_of[t] = full_name
         self.full_names = tuple(self.full_names)
-        self.image_directory = image_directory 
+        self.image_directory = image_directory
+        self.defaults = dict()
 
-    def true_size(self):
-        img = Image.open(self.full_names[0])
-        return img.size
+    def set_defaults(self, image_to_default_variable_map, configuration):
+        template_defaults = {
+            'brightness' : 1.0,
+            'size' : configuration["IMAGE_DISPLAY"]["Default_scale"],
+            'broad_image' : None,
+            'location' : None
+            }
+        for img_name in self.full_names:
+            if img_name in image_to_default_variable_map:
+                template_defaults |= image_to_default_variable_map[img_name]
+                break
+        self.defaults = template_defaults
 
-    def standard_show(self, the_type, size_str, brightness=1):
-        # Displays a picture when called which has been scaled to the given size (size_str) and with given brightness factor
+    def standard_show(self, the_type, brightness=1):
+        # Displays a picture when called which has been scaled to default_size,
+        # and with given brightness factor
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         width, height = img.size
-        size = size_str.strip(" ").strip("(").strip(")").strip(" ").split(",")
-        if not size_str:
+        size = self.defaults["size"].strip(" ").strip("(").strip(")").strip(" ").split(",")
+        if not self.defaults["size"]:
             st.image(img, output_format='png')
             return None
         elif len(size) == 1:
@@ -81,6 +92,17 @@ class Picture:
                 st.image(new_img, output_format='png')
             else:
                 st.image(increase_brightness(new_img, brightness), output_format='png')
+    
+    def show_broader_image(self, brightness=1):
+        # shows the broader image with an square where the images are extracted
+        if self.defaults["broad_image"]:
+            path_to_broad_image =self.image_directory + '/broad_images/' + self.defaults["broad_image"]
+            img = Image.open(path_to_broad_image)
+            pre_coordinates = self.defaults["location"].strip('[').strip(']').split(',')
+            coordinates = [int(x.strip('(').strip(')')) for x in pre_coordinates]
+            draw = ImageDraw.Draw(img)
+            draw.rectangle(coordinates, outline="red", width=2)
+            st.image(img, output_format='png')
 
 class Question:
     def __init__(self, key, name_in_database, type_of_question, question_description, possible_answers=None):
@@ -155,10 +177,12 @@ def get_all_picture(path_to_images_directory=None):
     types = []
     extension = ""
     for name in sorted(images_log):
-
+        if name == "broad_images": # skip directory
+            continue
         # Check for correct format, 
         # and extract sample type and extention names for Picture class.
         sample_typeextension = name.split("__")
+
         if len(sample_typeextension) != 2:
             raise Exception(f"Error: could not read {name}, " 
             + "image name has to have following form: {sample}___{type}.{extension} in the image folder")
@@ -222,6 +246,27 @@ def get_questions(configuration):
             else:
                 key += len(question_class.options)        
     return questions_list
+
+def get_default_image_value_mapping(path_to_questionnaire):
+    default_value_map = dict()
+    file = path_to_questionnaire + "/" + path_to_questionnaire.split("/")[-1] + "_images_default_values.csv"
+    is_fst_row = True
+    with open(file) as csvfile:
+        reader = csv.reader(csvfile, dialect='unix')
+        for row in reader:
+            if is_fst_row:
+                image_variables = row[1:]
+                is_fst_row = False
+            else:
+                subdictionary = dict()
+                for i, variable in enumerate(image_variables):
+                    subdictionary[variable] = row[i+1]
+                default_value_map[row[0]] = subdictionary
+    return default_value_map
+
+def update_default_settings(picture_sequence, image_to_default_map, configuration):
+    for pict in picture_sequence:
+        pict.set_defaults(image_to_default_map, configuration)
 
 def get_input_to_hotkey_bindings(questions_sequence):
     # given a list of Questions it returns a map with the correct responce to each key
@@ -412,10 +457,10 @@ if not st.session_state.name_entered:
             st.session_state.evaluators_name = evaluator.strip(" ").lower()
             database = create_database(
                 temporary_config,
-                questionnaires_options[selected_questionnaire]
+                path_to_questionnaire
                 )
             to_evaluate_pictures = get_not_yet_evaluated_pictures(
-                get_all_picture(questionnaires_options[selected_questionnaire] + "/images"),
+                get_all_picture(path_to_questionnaire + "/images"),
                 database[0],
                 database[2],
                 evaluator
@@ -424,13 +469,19 @@ if not st.session_state.name_entered:
                 # in case that there are still unevaluated images by the evaluator
                 st.session_state.progress = 1
                 st.session_state.name_entered = True
+                st.session_state.configurations = temporary_config
+                # randomize the picture order
                 st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures))
+                update_default_settings(
+                    st.session_state.picture_seq,
+                    get_default_image_value_mapping(path_to_questionnaire),
+                    temporary_config
+                    )
                 st.session_state.startOfSession_picture_seq = st.session_state.picture_seq
                 st.session_state.number_of_pictures = len(to_evaluate_pictures)
                 st.session_state.current_picture = st.session_state.picture_seq.pop()
-                st.session_state.configurations = temporary_config
                 st.session_state.questions_to_ask = get_questions(st.session_state.configurations)
-                st.session_state.path_to_questionnaire = questionnaires_options[selected_questionnaire]
+                st.session_state.path_to_questionnaire = path_to_questionnaire
                 st.session_state.hotkeys = get_input_to_hotkey_bindings(st.session_state.questions_to_ask)
                 write_hotkey_configurations_html_file(
                     st.session_state.hotkeys, 
@@ -467,7 +518,7 @@ elif st.session_state.keep_identifying:
             "Brightness of images",
             0.0,
             float(st.session_state.configurations["IMAGE_DISPLAY"]['Max_Brightness']), 
-            float(st.session_state.configurations["IMAGE_DISPLAY"]['Default_Brightness']),
+            float(st.session_state.current_picture.defaults["brightness"]),
             0.1,
             key="slider"+str(st.session_state.slider_key)
             )
@@ -540,10 +591,13 @@ elif st.session_state.keep_identifying:
                 st.write(variation[i])
                 st.session_state.current_picture.standard_show(
                     variation[i],
-                    st.session_state.configurations['IMAGE_DISPLAY']["Default_scale"],
                     brightness_setting
                     )
-        
+        if st.session_state.current_picture.defaults["broad_image"]:
+            # show broad_image
+            st.write("Images from above are located in the marked square.")
+            st.session_state.current_picture.show_broader_image(brightness_setting)
+
         # shows scaleable images
         if st.session_state.configurations['IMAGE_DISPLAY']["Rescaleability"] == "Enable":
             if picture_slider == 1:
