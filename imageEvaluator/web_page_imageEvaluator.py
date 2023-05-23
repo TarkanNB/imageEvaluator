@@ -2,30 +2,38 @@
     and shows them in a random order one by one on a webpage.
     Were it will ask the evaluator for questions for each image as given in the configuration.ini file.
     The evaluations for a image will be stored in an answer database whenever the evaluator clicks on the next image buton
-    finaly, it will store these responses in a datasheet after the last image has been shown. 
+    finaly, it will store these responses in a datasheet after the last image has been shown if enabled in configuration.ini file. 
 """
 
 from datetime import datetime
 import os
 import csv
 import random as rd
+import numpy as np
 import sqlite3
 import configparser
-from PIL import Image, ImageEnhance, ImageDraw
+from PIL import Image, ImageDraw
 import streamlit as st
 import streamlit.components.v1 as components
 
 ###################################################################
 
-def increase_brightness(image, brightness):
-    if image.mode not in ['L', 'RGB', 'RGBA']:
-        pre_image = image.convert('I')
-        img = pre_image.point(lambda i:i*(1./256)).convert('L')
-    else:
-        img = image
-    enhancer = ImageEnhance.Brightness(img)
-    return enhancer.enhance(brightness)
-        
+
+def intensity_pointer(pixel_value, scaler, minimum, newMin):
+    return (pixel_value - minimum)*scaler + newMin
+
+def normalize_image_intensity(image, intensity):
+    im_array = np.array(image)
+    minimum = im_array.min()
+    new_minimum = intensity[0]*im_array.min()
+    maximum = im_array.max()
+    new_maximum = intensity[1]*im_array.max()
+    scaler = (new_maximum - new_minimum)/(maximum - minimum)
+    normalizations_map = np.vectorize(intensity_pointer)
+    im_norm = normalizations_map(im_array, scaler, minimum, new_minimum)
+    return Image.fromarray(im_norm.astype('int32'))
+
+
 class Picture:
     # Grouping of images of the same sample
     def __init__(self, sample_name, types, extension, image_directory):
@@ -41,29 +49,33 @@ class Picture:
         self.image_directory = image_directory
         self.defaults = dict() # default image display values
 
-    def set_defaults(self, image_to_default_variable_map, configuration):
+    def set_defaults(self, configuration, image_to_default_variable_map = None):
         # initialaze defaults when there exists a standart default for one of the images in image_to_default_variable_map
         template_defaults = {
-            'brightness' : 1.0,
+            'intensity' : configuration["IMAGE_DISPLAY"]["Default_intensity"],
             'size' : configuration["IMAGE_DISPLAY"]["Default_scale"],
             'broad_image' : None,
             'location' : None
             }
-        for img_name in self.full_names:
-            if img_name in image_to_default_variable_map:
-                template_defaults |= image_to_default_variable_map[img_name]
-                break
+        if image_to_default_variable_map:
+            for img_name in self.full_names:
+                if img_name in image_to_default_variable_map:
+                    template_defaults |= image_to_default_variable_map[img_name]
+                    break
         self.defaults = template_defaults
 
-    def standard_show(self, the_type, brightness=1):
+    def standard_show(self, the_type, intensity=None):
         # Displays a picture when called which has been scaled to default_size,
-        # and with given brightness factor
+        # and with given intensity factor
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         width, height = img.size
         size = self.defaults["size"].strip(" ").strip("(").strip(")").strip(" ").split(",")
         if not self.defaults["size"]:
-            st.image(img, output_format='png')
+            if intensity:
+                st.image(normalize_image_intensity(img, intensity), output_format='png')
+            else:
+                st.image(img, output_format='png')
             return None
         elif len(size) == 1:
             image_size = (int(size[0]), int(size[0]))
@@ -72,30 +84,30 @@ class Picture:
         else:
             raise Exception("Error: Could not interpret the Default scale in configuration file.")
         new_img = img.resize(image_size)
-        if brightness == 1:
+        if intensity == None:
             st.image(new_img, output_format='png')
         else:
-            st.image(increase_brightness(new_img, brightness), output_format='png')
+            st.image(normalize_image_intensity(new_img, intensity), output_format='png')
 
-    def show(self, the_type, scale=1, brightness=1):
-        # Displays the image on the webpage with specified scale and brightness.
+    def scaled_show(self, the_type, scale=1, intensity=1):
+        # Displays the image on the webpage with specified scale and intensity.
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         if scale == 1:
-            if brightness == 1:
+            if intensity == None:
                 st.image(img, output_format='png')
             else:
-                st.image(increase_brightness(img, brightness), output_format='png')
+                st.image(normalize_image_intensity(img, intensity), output_format='png')
         else:
             width, height = img.size
             image_size = (width * scale, height * scale)
             new_img = img.resize(image_size)
-            if brightness == 1:
+            if intensity == None:
                 st.image(new_img, output_format='png')
             else:
-                st.image(increase_brightness(new_img, brightness), output_format='png')
+                st.image(normalize_image_intensity(new_img, intensity), output_format='png')
     
-    def show_broader_image(self, brightness=1):
+    def show_broader_image(self):
         # shows the broader image with an square where the images are located
         if self.defaults["broad_image"]:
             path_to_broad_image =self.image_directory + '/broad_images/' + self.defaults["broad_image"]
@@ -268,9 +280,25 @@ def get_default_image_value_mapping(path_to_questionnaire):
                 default_value_map[row[0]] = subdictionary
     return default_value_map
 
-def update_default_settings(picture_sequence, image_to_default_map, configuration):
-    for pict in picture_sequence:
-        pict.set_defaults(image_to_default_map, configuration)
+def update_default_settings(picture_sequence, path_to_questionnaire, configuration):
+    # updates the default_settings for all Pictures in picture_sequence:
+    #  with values from <folder_name>_images_default_values.csv file and/or configurations 
+    name_map_csv = path_to_questionnaire.split('/')[-1] + "_images_default_values.csv"
+    if name_map_csv in os.listdir(path_to_questionnaire):
+        # <folder_name>_images_default_values.csv exists in questionnaire folder
+        for pict in picture_sequence:
+            pict.set_defaults(configuration, get_default_image_value_mapping(path_to_questionnaire))
+    else:
+        for pict in picture_sequence:
+            pict.set_defaults(configuration)
+
+def extract_list(string, as_number=False):
+    string_list = string.strip("[").strip("[").strip("(").strip(")").split(",")
+    if as_number:
+        if "." in string:
+            return [float(n) for n in string_list]
+        return [int(n) for n in string_list]
+    return string_list
 
 def get_input_to_hotkey_bindings(questions_sequence):
     # given a list of Questions it returns a map with the correct responce to each key
@@ -405,7 +433,8 @@ def create_database(configuration, path_to_database_folder):
 def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evaluator):
     # returns all pictures that evaluator has not evaluated in the image folder.
     remaining_pictures = []
-    seen_sample_list = [row[0] for row in cursor_db.execute("SELECT id, evaluators_name FROM " + database + " WHERE evaluators_name='" + name_of_evaluator + "'")]    
+    name_of_evaluator_in_database = name_of_evaluator.lower()
+    seen_sample_list = [row[0] for row in cursor_db.execute("SELECT id, evaluators_name FROM " + database + " WHERE evaluators_name='" + name_of_evaluator_in_database + "'")]    
     for picture in pictures:
         if not picture.sample in seen_sample_list:
             remaining_pictures.append(picture)
@@ -441,6 +470,7 @@ if 'slider_key' not in st.session_state:
 ## Rendering of the web page
 ##
 
+st.set_page_config(layout="wide")
 
 # Starting web page for entering the evaluators name and choosing questionnaire.
 if not st.session_state.name_entered:
@@ -483,7 +513,7 @@ if not st.session_state.name_entered:
                 st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures)) # randomize the picture order
                 update_default_settings(
                     st.session_state.picture_seq,
-                    get_default_image_value_mapping(path_to_questionnaire),
+                    path_to_questionnaire,
                     temporary_config
                     ) # initialize image defaults for all picture classes in picture sequence
                 st.session_state.startOfSession_picture_seq = st.session_state.picture_seq
@@ -524,12 +554,12 @@ elif st.session_state.keep_identifying:
             else:
                 check_box_type_indexes.append(i)
         
-        # slider to control the brightness of images
-        brightness_setting = st.slider(
-            "Brightness of images",
+        # slider to control the intensity of images
+        intensity_setting = st.slider(
+            "intensity of images",
             0.0,
-            float(st.session_state.configurations["IMAGE_DISPLAY"]['Max_Brightness']), 
-            float(st.session_state.current_picture.defaults["brightness"]),
+            float(st.session_state.configurations["IMAGE_DISPLAY"]['Max_intensity']), 
+            extract_list((st.session_state.current_picture.defaults["intensity"]), True),
             0.1,
             key="slider"+str(st.session_state.slider_key)
             )
@@ -604,12 +634,13 @@ elif st.session_state.keep_identifying:
                 st.write(variation[i])
                 st.session_state.current_picture.standard_show(
                     variation[i],
-                    brightness_setting
+                    intensity_setting
                     )
+        
         if st.session_state.current_picture.defaults["broad_image"]:
             # show broad_image
             st.write("Images from above are located in the marked square.")
-            st.session_state.current_picture.show_broader_image(brightness_setting)
+            st.session_state.current_picture.show_broader_image()
 
         # shows scaleable images
         if st.session_state.configurations['IMAGE_DISPLAY']["Rescaleability"] == "Enable":
@@ -619,10 +650,10 @@ elif st.session_state.keep_identifying:
                 st.write(f"image scaled x{picture_slider} times")
             for var in variation:
                 st.write(var)
-                st.session_state.current_picture.show(
+                st.session_state.current_picture.scaled_show(
                     var,
                     picture_slider,
-                    brightness_setting
+                    intensity_setting
                     )
 
 # Ending web page 
