@@ -2,7 +2,7 @@
     and shows them in a random order one by one on a webpage.
     Were it will ask the evaluator for questions for each image as given in the configuration.ini file.
     The evaluations for a image will be stored in an answer database whenever the evaluator clicks on the next image buton
-    finaly, it will store these responses in a datasheet after the last image has been shown if enabled in configuration.ini file. 
+    finaly, it will store these responses in a datasheet after the last image has been shown. 
 """
 
 from datetime import datetime
@@ -17,21 +17,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 ###################################################################
-
-
-def intensity_pointer(pixel_value, scaler, minimum, newMin):
-    return (pixel_value - minimum)*scaler + newMin
-
-def normalize_image_intensity(image, intensity):
-    im_array = np.array(image)
-    minimum = im_array.min()
-    new_minimum = intensity[0]*im_array.min()
-    maximum = im_array.max()
-    new_maximum = intensity[1]*im_array.max()
-    scaler = (new_maximum - new_minimum)/(maximum - minimum)
-    normalizations_map = np.vectorize(intensity_pointer)
-    im_norm = normalizations_map(im_array, scaler, minimum, new_minimum)
-    return Image.fromarray(im_norm.astype('int32'))
 
 
 class Picture:
@@ -49,33 +34,27 @@ class Picture:
         self.image_directory = image_directory
         self.defaults = dict() # default image display values
 
-    def set_defaults(self, configuration, image_to_default_variable_map = None):
+    def set_defaults(self, image_to_default_variable_map, configuration):
         # initialaze defaults when there exists a standart default for one of the images in image_to_default_variable_map
         template_defaults = {
-            'intensity' : configuration["IMAGE_DISPLAY"]["Default_intensity"],
             'size' : configuration["IMAGE_DISPLAY"]["Default_scale"],
             'broad_image' : None,
             'location' : None
             }
-        if image_to_default_variable_map:
-            for img_name in self.full_names:
-                if img_name in image_to_default_variable_map:
-                    template_defaults |= image_to_default_variable_map[img_name]
-                    break
+        for img_name in self.full_names:
+            if img_name in image_to_default_variable_map:
+                template_defaults |= image_to_default_variable_map[img_name]
+                break
         self.defaults = template_defaults
 
-    def standard_show(self, the_type, intensity=None):
-        # Displays a picture when called which has been scaled to default_size,
-        # and with given intensity factor
+    def standard_show(self, the_type):
+        # Displays a picture when called which has been scaled to default_size
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         width, height = img.size
         size = self.defaults["size"].strip(" ").strip("(").strip(")").strip(" ").split(",")
         if not self.defaults["size"]:
-            if intensity:
-                st.image(normalize_image_intensity(img, intensity), output_format='png')
-            else:
-                st.image(img, output_format='png')
+            st.image(img, output_format='png')
             return None
         elif len(size) == 1:
             image_size = (int(size[0]), int(size[0]))
@@ -84,28 +63,19 @@ class Picture:
         else:
             raise Exception("Error: Could not interpret the Default scale in configuration file.")
         new_img = img.resize(image_size)
-        if intensity == None:
-            st.image(new_img, output_format='png')
-        else:
-            st.image(normalize_image_intensity(new_img, intensity), output_format='png')
+        st.image(new_img, output_format='png')
 
-    def scaled_show(self, the_type, scale=1, intensity=1):
-        # Displays the image on the webpage with specified scale and intensity.
+    def scaled_show(self, the_type, scale=1):
+        # Displays the image on the webpage with specified scale.
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
         img = Image.open(path_to_image)
         if scale == 1:
-            if intensity == None:
-                st.image(img, output_format='png')
-            else:
-                st.image(normalize_image_intensity(img, intensity), output_format='png')
+            st.image(img, output_format='png')
         else:
             width, height = img.size
             image_size = (width * scale, height * scale)
             new_img = img.resize(image_size)
-            if intensity == None:
-                st.image(new_img, output_format='png')
-            else:
-                st.image(normalize_image_intensity(new_img, intensity), output_format='png')
+            st.image(new_img, output_format='png')
     
     def show_broader_image(self):
         # shows the broader image with an square where the images are located
@@ -199,11 +169,11 @@ def get_all_picture(path_to_images_directory=None):
         sample_typeextension = name.split("__")
         if len(sample_typeextension) != 2:
             raise Exception(f"Error: could not read {name}, " 
-            + "image name has to have following form: {sample}___{type}.{extension} in the image folder")
+            + "image name has to have following form: {sample}__{type}.{extension} in the image folder")
         type_extension = sample_typeextension[1].split(".")
         if len(type_extension) != 2:
             raise Exception(f"Error: could not read {name}, "
-            + "image name has to have following form: {sample}___{type}.{extension} in de image folder")
+            + "image name has to have following form: {sample}__{type}.{extension} in de image folder")
         extension = type_extension[1]
         if extension not in ["jpg", "jpeg", "jfif", "pjpeg", "pjp", "png", "svg"]:
             raise Exception(f"Error: uncleare extension in picture_folder: {extension} of file: {name}")
@@ -263,7 +233,11 @@ def get_questions(configuration):
 
 def get_default_image_value_mapping(path_to_questionnaire):
     # Takes path to <folder_name>_images_default_values.csv file,
-    # and returns a python_dictionary with  
+    # and returns a python_dictionary
+    file_name = path_to_questionnaire.split("/")[-1] + "_images_default_values.csv"
+    if not file_name in os.listdir(path_to_questionnaire):
+        return None
+    
     default_value_map = dict()
     file = path_to_questionnaire + "/" + path_to_questionnaire.split("/")[-1] + "_images_default_values.csv"
     is_fst_row = True
@@ -280,17 +254,11 @@ def get_default_image_value_mapping(path_to_questionnaire):
                 default_value_map[row[0]] = subdictionary
     return default_value_map
 
-def update_default_settings(picture_sequence, path_to_questionnaire, configuration):
-    # updates the default_settings for all Pictures in picture_sequence:
-    #  with values from <folder_name>_images_default_values.csv file and/or configurations 
-    name_map_csv = path_to_questionnaire.split('/')[-1] + "_images_default_values.csv"
-    if name_map_csv in os.listdir(path_to_questionnaire):
-        # <folder_name>_images_default_values.csv exists in questionnaire folder
-        for pict in picture_sequence:
-            pict.set_defaults(configuration, get_default_image_value_mapping(path_to_questionnaire))
-    else:
-        for pict in picture_sequence:
-            pict.set_defaults(configuration)
+def update_default_settings(picture_sequence, configuration, image_to_default_map=None):
+    if not image_to_default_map:
+        image_to_default_map = dict()
+    for pict in picture_sequence:
+        pict.set_defaults(image_to_default_map, configuration)
 
 def extract_list(string, as_number=False):
     string_list = string.strip("[").strip("[").strip("(").strip(")").split(",")
@@ -513,8 +481,8 @@ if not st.session_state.name_entered:
                 st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures)) # randomize the picture order
                 update_default_settings(
                     st.session_state.picture_seq,
-                    path_to_questionnaire,
-                    temporary_config
+                    temporary_config,
+                    get_default_image_value_mapping(path_to_questionnaire)             
                     ) # initialize image defaults for all picture classes in picture sequence
                 st.session_state.startOfSession_picture_seq = st.session_state.picture_seq
                 st.session_state.number_of_pictures = len(to_evaluate_pictures)
@@ -553,16 +521,6 @@ elif st.session_state.keep_identifying:
                 st.write(f"Selected: {responses[i].split('<')[0]}")
             else:
                 check_box_type_indexes.append(i)
-        
-        # slider to control the intensity of images
-        intensity_setting = st.slider(
-            "intensity of images",
-            0.0,
-            float(st.session_state.configurations["IMAGE_DISPLAY"]['Max_intensity']), 
-            extract_list((st.session_state.current_picture.defaults["intensity"]), True),
-            0.1,
-            key="slider"+str(st.session_state.slider_key)
-            )
 
         if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
             # slider to control the scale of bottom images
@@ -633,8 +591,7 @@ elif st.session_state.keep_identifying:
             with col:
                 st.write(variation[i])
                 st.session_state.current_picture.standard_show(
-                    variation[i],
-                    intensity_setting
+                    variation[i]
                     )
         
         if st.session_state.current_picture.defaults["broad_image"]:
@@ -652,9 +609,16 @@ elif st.session_state.keep_identifying:
                 st.write(var)
                 st.session_state.current_picture.scaled_show(
                     var,
-                    picture_slider,
-                    intensity_setting
+                    picture_slider
                     )
+
+    # Enable the hotkeys via the generated_hotkey.html file
+    components.html(
+            read_html("generated_hotkey.html"),
+            height=0,
+            width=0,
+        )
+
 
 # Ending web page 
 else:
@@ -665,11 +629,3 @@ else:
             st.session_state.startOfSession_picture_seq,
             st.session_state.image_to_id_dictionary,
             st.session_state.evaluators_name)
-
-
-# Enable the hotkeys via the generated_hotkey.html file
-components.html(
-            read_html("generated_hotkey.html"),
-            height=0,
-            width=0,
-        )
