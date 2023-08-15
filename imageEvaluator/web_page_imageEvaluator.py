@@ -144,8 +144,12 @@ def get_questionnaires_options():
         questionnaires[option] = get_the_path_to_main_directory() + f"/data/{option}"
     return questionnaires 
 
-@st.cache_data
-def get_all_picture(path_to_images_directory=None):
+def split_in_name_rest(name, seperator):
+    seperations = name.split(seperator)
+    head = seperations.pop()
+    return (seperator.join(seperations), head)
+
+def get_all_picture(configuration, path_to_images_directory=None):
     # Get all  the images from images_directory and returns a list of Pictures
     # (images get grouped by there sample_name in a Picture class)
 
@@ -155,6 +159,8 @@ def get_all_picture(path_to_images_directory=None):
     else:
         path_to_images_directory = './images'
         images_log = os.listdir(get_the_path_to_main_directory() + '/images')
+
+    seperators = configuration["IMAGE_DISPLAY"]["Image_naming_structure"].strip(' ').strip('sample').strip('extension').split('type')
 
     pictures = []
     sample_name = ""
@@ -166,15 +172,9 @@ def get_all_picture(path_to_images_directory=None):
         
         # Check for correct image_file format, 
         # if correct format: extract sample type and extention names for Picture class.
-        sample_typeextension = name.split("__")
-        if len(sample_typeextension) != 2:
-            raise Exception(f"Error: could not read {name}, " 
-            + "image name has to have following form: {sample}__{type}.{extension} in the image folder")
-        type_extension = sample_typeextension[1].split(".")
-        if len(type_extension) != 2:
-            raise Exception(f"Error: could not read {name}, "
-            + "image name has to have following form: {sample}__{type}.{extension} in de image folder")
-        extension = type_extension[1]
+        sample_typeextension = split_in_name_rest(name,seperators[0])
+        type_extension =  split_in_name_rest(sample_typeextension[-1], seperators[1])
+        extension = type_extension[-1]
         if extension not in ["jpg", "jpeg", "jfif", "pjpeg", "pjp", "png", "svg"]:
             raise Exception(f"Error: uncleare extension in picture_folder: {extension} of file: {name}")
 
@@ -467,7 +467,7 @@ if not st.session_state.name_entered:
                 path_to_questionnaire
                 )
             to_evaluate_pictures = get_not_yet_evaluated_pictures(
-                get_all_picture(path_to_questionnaire + "/images"),
+                get_all_picture(temporary_config, path_to_questionnaire + "/images"),
                 database[0],
                 database[2],
                 evaluator
