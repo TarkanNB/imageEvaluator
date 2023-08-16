@@ -27,7 +27,7 @@ class Picture:
         self.full_name_of = dict() # get file_name(string) of image of [specified type]
         self.full_names = [] # get all image_file_names
         for t in types:
-            full_name = sample_name + "__" + t + "." + extension
+            full_name = sample_name + "_" + t + "." + extension
             self.full_names.append(full_name)
             self.full_name_of[t] = full_name
         self.full_names = tuple(self.full_names)
