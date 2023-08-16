@@ -18,16 +18,15 @@ import streamlit.components.v1 as components
 
 ###################################################################
 
-
 class Picture:
     # Grouping of images of the same sample
-    def __init__(self, sample_name, types, extension, image_directory):
+    def __init__(self, sample_name, types, extension, seperators, image_directory):
         self.sample = sample_name   # string
         self.types = types   # list of str
         self.full_name_of = dict() # get file_name(string) of image of [specified type]
         self.full_names = [] # get all image_file_names
         for t in types:
-            full_name = sample_name + "_" + t + "." + extension
+            full_name = sample_name + seperators[0] + t + seperators[1] + extension
             self.full_names.append(full_name)
             self.full_name_of[t] = full_name
         self.full_names = tuple(self.full_names)
@@ -182,7 +181,7 @@ def get_all_picture(configuration, path_to_images_directory=None):
         if sample_name == sample_typeextension[0]:
             types.append(type_extension[0])
         elif types:
-            pictures.append(Picture(sample_name, types, extension, path_to_images_directory))
+            pictures.append(Picture(sample_name, types, extension, seperators, path_to_images_directory))
             sample_name = sample_typeextension[0]
             types = [type_extension[0]]
         else:
