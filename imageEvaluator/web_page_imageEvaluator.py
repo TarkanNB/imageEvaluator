@@ -274,6 +274,24 @@ def get_input_to_hotkey_bindings(questions_sequence):
         option_to_hotkey.update(question.hotkeys)
     return option_to_hotkey
 
+def write_images_html_file(brightness,contrast):
+    html_file_start = """<script>
+    const streamlitDoc = window.parent.document;
+    images = Array.from(streamlitDoc.getElementsByTagName('img')); 
+    console.log(images);
+    for(var i = 1; i < images.length; i++) {"""
+    
+    html_file_middle = """}
+    for(var i = 1; i < images.length; i++) {"""
+
+    html_file_end="""} 
+    </script>"""
+    
+    with open("images.html", 'w') as image_file:
+        image_file.write(html_file_start)
+        image_file.write(f"images[i].style.filter = 'brightness({brightness}) contrast({contrast})';")
+        image_file.write(html_file_end)
+
 def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next_image_button_hotkey, workflow_config):
     # Writes a generated_hotkey.html file to modify the streamlit generated HTML file,
     # to inject specific key bord listener (= hotkeys) 
@@ -520,6 +538,20 @@ elif st.session_state.keep_identifying:
                 st.write(f"Selected: {responses[i].split('<')[0]}")
             else:
                 check_box_type_indexes.append(i)
+        image_intensity = st.slider(
+            "image brightness",
+            0.0,
+            5.0,
+            1.0,
+            key="slider_bright"+str(st.session_state.slider_key+1)
+        )
+        image_contrast = st.slider(
+            "image contrast",
+            0.0,
+            5.0,
+            1.0,
+            key="slider_cont"+str(st.session_state.slider_key+1)
+        )
 
         if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
             # slider to control the scale of bottom images
@@ -528,7 +560,7 @@ elif st.session_state.keep_identifying:
                 1,
                 int(st.session_state.configurations['IMAGE_DISPLAY']['Max_scale']),
                 1,
-                key="slider"+str(st.session_state.slider_key+1)
+                key="slider_scale"+str(st.session_state.slider_key+1)
             )
 
         next_picture_button = st.button("Next_image")
@@ -610,6 +642,11 @@ elif st.session_state.keep_identifying:
                     var,
                     picture_slider
                     )
+        #components.html(
+        #read_html("image_intensity.html"),
+        #height=10,
+        #width=10,
+        #)
 
     # Enable the hotkeys via the generated_hotkey.html file
     components.html(
@@ -617,6 +654,13 @@ elif st.session_state.keep_identifying:
             height=0,
             width=0,
         )
+    
+    write_images_html_file(image_intensity, image_contrast)
+    components.html(
+        read_html("images.html"),
+        height=0,
+        width=0,
+    )
 
 
 # Ending web page 
