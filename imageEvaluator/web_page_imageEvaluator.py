@@ -18,6 +18,35 @@ import streamlit.components.v1 as components
 
 ###################################################################
 
+@st.cache_data
+def private_standard_show(image_path, default_size):
+        img = Image.open(image_path)
+        width, height = img.size
+        size = default_size.strip(" ").strip("(").strip(")").strip(" ").split(",")
+        if size == "":
+            st.image(img, output_format='png')
+            return None
+        elif len(size) == 1:
+            image_size = (int(size[0]), int(size[0]))
+        elif len(size) == 2:
+            image_size = (int(size[0]), int(size[1]))
+        else:
+            raise Exception("Error: Could not interpret the Default scale in configuration file.")
+        new_img = img.resize(image_size)
+        st.image(new_img, output_format='png')
+
+@st.cache_data
+def private_scaled_show(image_path, scale):
+        img = Image.open(image_path)
+        if scale == 1:
+            st.image(img, output_format='png')
+        else:
+            width, height = img.size
+            image_size = (width * scale, height * scale)
+            new_img = img.resize(image_size)
+            st.image(new_img, output_format='png')
+
+
 class Picture:
     # Grouping of images of the same sample
     def __init__(self, sample_name, types, extension, seperators, image_directory):
@@ -32,6 +61,7 @@ class Picture:
         self.full_names = tuple(self.full_names)
         self.image_directory = image_directory
         self.defaults = dict() # default image display values
+        self.scale_bar = 0
 
     def set_defaults(self, image_to_default_variable_map, configuration):
         # initialaze defaults when there exists a standart default for one of the images in image_to_default_variable_map
@@ -49,32 +79,12 @@ class Picture:
     def standard_show(self, the_type):
         # Displays a picture when called which has been scaled to default_size
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
-        img = Image.open(path_to_image)
-        width, height = img.size
-        size = self.defaults["size"].strip(" ").strip("(").strip(")").strip(" ").split(",")
-        if not self.defaults["size"]:
-            st.image(img, output_format='png')
-            return None
-        elif len(size) == 1:
-            image_size = (int(size[0]), int(size[0]))
-        elif len(size) == 2:
-            image_size = (int(size[0]), int(size[1]))
-        else:
-            raise Exception("Error: Could not interpret the Default scale in configuration file.")
-        new_img = img.resize(image_size)
-        st.image(new_img, output_format='png')
+        private_standard_show(path_to_image, self.defaults['size'])      
 
     def scaled_show(self, the_type, scale=1):
         # Displays the image on the webpage with specified scale.
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
-        img = Image.open(path_to_image)
-        if scale == 1:
-            st.image(img, output_format='png')
-        else:
-            width, height = img.size
-            image_size = (width * scale, height * scale)
-            new_img = img.resize(image_size)
-            st.image(new_img, output_format='png')
+        private_scaled_show(path_to_image, scale)
     
     def show_broader_image(self):
         # shows the broader image with an square where the images are located
@@ -280,13 +290,10 @@ def write_images_html_file(brightness,contrast):
     images = Array.from(streamlitDoc.getElementsByTagName('img')); 
     console.log(images);
     for(var i = 1; i < images.length; i++) {"""
-    
-    html_file_middle = """}
-    for(var i = 1; i < images.length; i++) {"""
 
     html_file_end="""} 
     </script>"""
-    
+
     with open("images.html", 'w') as image_file:
         image_file.write(html_file_start)
         image_file.write(f"images[i].style.filter = 'brightness({brightness}) contrast({contrast})';")
@@ -605,6 +612,7 @@ elif st.session_state.keep_identifying:
             # Ending the session if all pictures have passed
             if st.session_state.progress > st.session_state.number_of_pictures:
                 st.session_state.keep_identifying = False  # stop rendering #Evaluation_of_current_picture_web_page
+            st.cache_data.clear()
             st.experimental_rerun()  # go to next web page
         button_hotkey_str = st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"]
         st.write(f"<{button_hotkey_str}>")
@@ -642,11 +650,6 @@ elif st.session_state.keep_identifying:
                     var,
                     picture_slider
                     )
-        #components.html(
-        #read_html("image_intensity.html"),
-        #height=10,
-        #width=10,
-        #)
 
     # Enable the hotkeys via the generated_hotkey.html file
     components.html(
@@ -661,14 +664,3 @@ elif st.session_state.keep_identifying:
         height=0,
         width=0,
     )
-
-
-# Ending web page 
-else:
-    # finished with identification #
-    st.subheader(st.session_state.configurations["TEXT"]["End_Description"])
-    if st.session_state.configurations["DATABASE"]["Create_datasheet"] == "Enable":
-        create_datasheet(
-            st.session_state.startOfSession_picture_seq,
-            st.session_state.image_to_id_dictionary,
-            st.session_state.evaluators_name)
