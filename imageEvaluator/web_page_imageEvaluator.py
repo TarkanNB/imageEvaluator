@@ -284,7 +284,9 @@ def get_input_to_hotkey_bindings(questions_sequence):
         option_to_hotkey.update(question.hotkeys)
     return option_to_hotkey
 
+@st.cache_data
 def write_images_html_file(brightness,contrast):
+    # write the images.html file to enable brightness and contrast adjustment (via javascript) by the evaluator
     html_file_start = """<script>
     const streamlitDoc = window.parent.document;
     images = Array.from(streamlitDoc.getElementsByTagName('img')); 
