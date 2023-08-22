@@ -61,7 +61,6 @@ class Picture:
         self.full_names = tuple(self.full_names)
         self.image_directory = image_directory
         self.defaults = dict() # default image display values
-        self.scale_bar = 0
 
     def set_defaults(self, image_to_default_variable_map, configuration):
         # initialaze defaults when there exists a standart default for one of the images in image_to_default_variable_map
@@ -285,20 +284,36 @@ def get_input_to_hotkey_bindings(questions_sequence):
     return option_to_hotkey
 
 @st.cache_data
-def write_images_html_file(brightness,contrast):
+def write_images_html_file(brightness_array,contrasts_array, broad_image_displayed):
     # write the images.html file to enable brightness and contrast adjustment (via javascript) by the evaluator
+    
+    js_array = []
+    if broad_image_displayed:
+        full_brightness_array = brightness_array + [1.0] + brightness_array
+        full_contrasts_array = contrasts_array + [1.0] + contrasts_array
+        
+    else:
+        full_brightness_array = brightness_array+brightness_array
+        full_contrasts_array = contrasts_array+contrasts_array
+    for i, b in enumerate(full_brightness_array):
+        c = full_contrasts_array[i]
+        js_array.append(f'brightness({b}) contrast({c})')
+    
     html_file_start = """<script>
     const streamlitDoc = window.parent.document;
     images = Array.from(streamlitDoc.getElementsByTagName('img')); 
     console.log(images);
-    for(var i = 1; i < images.length; i++) {"""
-
-    html_file_end="""} 
+    """
+    html_file_end = """
+    for(var i = 1; i < images.length; i++) {
+        images[i].style.filter = intensity_contrasts_array[i-1];
+    }
     </script>"""
 
     with open("images.html", 'w') as image_file:
         image_file.write(html_file_start)
-        image_file.write(f"images[i].style.filter = 'brightness({brightness}) contrast({contrast})';")
+        image_file.write(f"intensity_contrasts_array = {js_array};\n")
+        image_file.write("console.log(intensity_contrasts_array);\n")
         image_file.write(html_file_end)
 
 def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next_image_button_hotkey, workflow_config):
@@ -547,20 +562,27 @@ elif st.session_state.keep_identifying:
                 st.write(f"Selected: {responses[i].split('<')[0]}")
             else:
                 check_box_type_indexes.append(i)
-        image_intensity = st.slider(
-            "image brightness",
-            0.0,
-            5.0,
-            1.0,
-            key="slider_bright"+str(st.session_state.slider_key+1)
-        )
-        image_contrast = st.slider(
-            "image contrast",
-            0.0,
-            5.0,
-            1.0,
-            key="slider_cont"+str(st.session_state.slider_key+1)
-        )
+        picture_types_brightnesses = []
+        picture_types_contrasts = []
+        for i, picture_type in enumerate(st.session_state.current_picture.types):
+            picture_types_brightnesses.append(
+                st.slider(
+                    f"image brightness of {picture_type}",
+                    0.0,
+                    5.0,
+                    1.0,
+                    key="slider_bright"+str(st.session_state.slider_key+i)
+                )
+            )
+            picture_types_contrasts.append(
+                st.slider(
+                    f"image contrast of {picture_type}",
+                    0.0,
+                    5.0,
+                    1.0,
+                    key="slider_cont"+str(st.session_state.slider_key+i)
+                )
+            )
 
         if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
             # slider to control the scale of bottom images
@@ -660,9 +682,25 @@ elif st.session_state.keep_identifying:
             width=0,
         )
     
-    write_images_html_file(image_intensity, image_contrast)
+    write_images_html_file(
+        picture_types_brightnesses, 
+        picture_types_contrasts, 
+        st.session_state.current_picture.defaults['broad_image'] != None
+        )
     components.html(
         read_html("images.html"),
         height=0,
         width=0,
     )
+
+
+# Ending web page 
+else:
+    # finished with identification #
+    st.subheader(st.session_state.configurations["TEXT"]["End_Description"])
+    if st.session_state.configurations["DATABASE"]["Create_datasheet"] == "Enable":
+        create_datasheet(
+            st.session_state.startOfSession_picture_seq,
+            st.session_state.image_to_id_dictionary,
+            st.session_state.evaluators_name)
+
