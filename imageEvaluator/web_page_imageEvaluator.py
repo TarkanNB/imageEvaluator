@@ -54,7 +54,7 @@ def private_write_images_intensity_html_file(distance_Img_scaledImg, maximum_int
     with open("images_intensity_ending.html", 'r') as constant_html:
         html_file_ending = constant_html.readlines()
    
-    with open("images_js2.html", "w") as images_file:
+    with open("images_js.html", "w") as images_file:
         images_file.write(html_file_start)
         images_file.write(f"distance_Img_scaledImg = {distance_Img_scaledImg}\n")
         images_file.write(f"maximum_sliders = {maximum_intensity}")
@@ -660,7 +660,7 @@ elif st.session_state.keep_identifying:
                     )
         # Enable image intensity sliders
         components.html(
-            read_html("images_js2.html"),
+            read_html("images_js.html"),
             height=0,
             width=0,
         )
