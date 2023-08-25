@@ -1,0 +1,96 @@
+<script>
+    // vaiable region (this code is modified by the web_page_imageEvaluator.py)
+    distance_Img_scaledImg = 6
+
+    // constant region (this code is conserved each time)
+    function getImages() {
+        return Array.from(window.parent.document.querySelectorAll('img'));
+    }
+    function getJS_sliders(js_slider_class) {
+        return Array.from(window.parent.document.getElementsByClassName(js_slider_class));
+    }
+
+    function createSlidersForParagraphsContainingText(targetString) {
+      const streamlitDoc = window.parent.document
+      const sliders = [];
+
+      const paragraphs = streamlitDoc.querySelectorAll('p');
+      paragraphs.forEach((paragraph) => {
+        const paragraphText = paragraph.textContent.trim();
+        if (paragraphText.includes(targetString)) {
+          const slider = streamlitDoc.createElement('input');
+          slider.type = 'range';
+          slider.min = 0;
+          slider.max = 50;
+          slider.value = 10; // Default value
+          slider.className = targetString
+
+          const valueDisplay = streamlitDoc.createElement('span');
+          valueDisplay.textContent = `Slider Value: ${slider.value/10}`;
+
+          slider.addEventListener('input', () => {
+            const sliderValue = parseInt(slider.value, 10);
+            valueDisplay.textContent = `Slider Value: ${sliderValue/10}`;
+          });
+
+          paragraph.appendChild(slider);
+          paragraph.appendChild(valueDisplay);
+          sliders.push(slider);
+        }
+      });
+
+      return sliders;
+    }
+
+    function getOrCreate_Sliders(js_slider_class) {
+        const streamlitDoc = window.parent.document;
+        const sliders = getJS_sliders(js_slider_class);
+        if (sliders.length === 0) {
+            return createSlidersForParagraphsContainingText(js_slider_class);
+        } else {
+            return sliders;
+        }
+    }
+
+    const brightness_sliders = getOrCreate_Sliders('brightness');
+    console.log(brightness_sliders);
+    const contrast_sliders = getOrCreate_Sliders('contrast');
+    console.log(contrast_sliders);
+
+    function updateImagesBySliders(img_dublication_distance, first_run) {
+        var images = getImages();
+        if (first_run) {
+            images = images.slice(1);
+        }
+        console.log(images)
+        for(var i = 0; i < brightness_sliders.length; i++) {
+            var img_filters = 'brightness(' + brightness_sliders[i].value/10 + ') contrast(' + contrast_sliders[i].value/10 + ')';
+            images[i].style.filter = img_filters;
+            if (img_dublication_distance !== 0) {
+                images[i+img_dublication_distance].style.filter = img_filters;
+            }
+        }
+    }
+
+    updateImagesBySliders(distance_Img_scaledImg, true);
+
+    all_sliders = [...getJS_sliders('brightness'), ...getJS_sliders('contrast')]
+    console.log(all_sliders)
+    all_sliders.forEach((slider) => {
+      slider.addEventListener('input', () => {
+        const sliderValue = parseInt(slider.value, 10);
+        updateImagesBySliders(distance_Img_scaledImg, false);
+      });
+    });
+
+    buttons = Array.from(window.parent.document.querySelectorAll("button"));
+    console.log('buttons');
+    
+    buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+            updateImagesBySliders(6, false);
+        });
+    });
+
+
+</script>
