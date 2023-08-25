@@ -565,24 +565,10 @@ elif st.session_state.keep_identifying:
         picture_types_brightnesses = []
         picture_types_contrasts = []
         for i, picture_type in enumerate(st.session_state.current_picture.types):
-            picture_types_brightnesses.append(
-                st.slider(
-                    f"image brightness of {picture_type}",
-                    0.0,
-                    5.0,
-                    1.0,
-                    key="slider_bright"+str(st.session_state.slider_key+i)
-                )
-            )
-            picture_types_contrasts.append(
-                st.slider(
-                    f"image contrast of {picture_type}",
-                    0.0,
-                    5.0,
-                    1.0,
-                    key="slider_cont"+str(st.session_state.slider_key+i)
-                )
-            )
+            st.write(f"image brightness of {picture_type}")
+            picture_types_brightnesses.append(f"image brightness of {picture_type}")
+            st.write(f"image contrast of {picture_type}")
+            picture_types_contrasts.append(f"image contrast of {picture_type}")
 
         if st.session_state.configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
             # slider to control the scale of bottom images
@@ -674,6 +660,11 @@ elif st.session_state.keep_identifying:
                     var,
                     picture_slider
                     )
+        components.html(
+            read_html("images_js.html"),
+            height=0,
+            width=0,
+        )
 
     # Enable the hotkeys via the generated_hotkey.html file
     components.html(
@@ -681,18 +672,6 @@ elif st.session_state.keep_identifying:
             height=0,
             width=0,
         )
-    
-    write_images_html_file(
-        picture_types_brightnesses, 
-        picture_types_contrasts, 
-        st.session_state.current_picture.defaults['broad_image'] != None
-        )
-    components.html(
-        read_html("images.html"),
-        height=0,
-        width=0,
-    )
-
 
 # Ending web page 
 else:
@@ -703,4 +682,3 @@ else:
             st.session_state.startOfSession_picture_seq,
             st.session_state.image_to_id_dictionary,
             st.session_state.evaluators_name)
-
