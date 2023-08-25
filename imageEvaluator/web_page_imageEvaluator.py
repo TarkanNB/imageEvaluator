@@ -46,6 +46,21 @@ def private_scaled_show(image_path, scale):
             new_img = img.resize(image_size)
             st.image(new_img, output_format='png')
 
+@st.cache_data
+def private_write_images_intensity_html_file(distance_Img_scaledImg, maximum_intensity):
+    html_file_start = """<script>
+    // vaiable region (this code is modified by the web_page_imageEvaluator.py)
+    """
+    with open("images_intensity_ending.html", 'r') as constant_html:
+        html_file_ending = constant_html.readlines()
+   
+    with open("images_js2.html", "w") as images_file:
+        images_file.write(html_file_start)
+        images_file.write(f"distance_Img_scaledImg = {distance_Img_scaledImg}\n")
+        images_file.write(f"maximum_sliders = {maximum_intensity}")
+        for line in html_file_ending:
+            images_file.write(line)
+
 
 class Picture:
     # Grouping of images of the same sample
@@ -95,6 +110,17 @@ class Picture:
             draw = ImageDraw.Draw(img)
             draw.rectangle(coordinates, outline="red", width=2)
             st.image(img, output_format='png')
+    
+    def write_images_intensity_html_file(self, configurations):
+        if configurations["IMAGE_DISPLAY"]["Rescaleability"] == "Enable":
+            if self.defaults['broad_image']:
+                distance_between_img_and_scaled_img = len(self.types)+1
+            else:
+                distance_between_img_and_scaled_img = len(self.types)
+        else:
+            distance_between_img_and_scaled_img = 0
+        
+        private_write_images_intensity_html_file(distance_between_img_and_scaled_img, configurations["IMAGE_DISPLAY"]["Max_brightness_and_contrast"])
 
 class Question:
     def __init__(self, key, name_in_database, type_of_question, question_description, possible_answers=None):
@@ -282,39 +308,6 @@ def get_input_to_hotkey_bindings(questions_sequence):
     for question in questions_sequence:
         option_to_hotkey.update(question.hotkeys)
     return option_to_hotkey
-
-@st.cache_data
-def write_images_html_file(brightness_array,contrasts_array, broad_image_displayed):
-    # write the images.html file to enable brightness and contrast adjustment (via javascript) by the evaluator
-    
-    js_array = []
-    if broad_image_displayed:
-        full_brightness_array = brightness_array + [1.0] + brightness_array
-        full_contrasts_array = contrasts_array + [1.0] + contrasts_array
-        
-    else:
-        full_brightness_array = brightness_array+brightness_array
-        full_contrasts_array = contrasts_array+contrasts_array
-    for i, b in enumerate(full_brightness_array):
-        c = full_contrasts_array[i]
-        js_array.append(f'brightness({b}) contrast({c})')
-    
-    html_file_start = """<script>
-    const streamlitDoc = window.parent.document;
-    images = Array.from(streamlitDoc.getElementsByTagName('img')); 
-    console.log(images);
-    """
-    html_file_end = """
-    for(var i = 1; i < images.length; i++) {
-        images[i].style.filter = intensity_contrasts_array[i-1];
-    }
-    </script>"""
-
-    with open("images.html", 'w') as image_file:
-        image_file.write(html_file_start)
-        image_file.write(f"intensity_contrasts_array = {js_array};\n")
-        image_file.write("console.log(intensity_contrasts_array);\n")
-        image_file.write(html_file_end)
 
 def write_hotkey_configurations_html_file(hotkeys_dict, questions_sequence, next_image_button_hotkey, workflow_config):
     # Writes a generated_hotkey.html file to modify the streamlit generated HTML file,
@@ -539,6 +532,10 @@ if not st.session_state.name_entered:
                     st.session_state.configurations["WORKFLOW"]["Next_image_button_hotkey"],
                     st.session_state.configurations["WORKFLOW"]["Change_image_after_choice_selection"]
                     )
+                
+                # write a HTML file to add javascript slider
+                st.session_state.current_picture.write_images_intensity_html_file(st.session_state.configurations)
+
                 st.experimental_rerun() # reload web page (go to #Evaluation_of_current_picture_web_page)
             else:
                 # in case there are no images to evaluate
@@ -618,6 +615,7 @@ elif st.session_state.keep_identifying:
             # change scope to new picture or go to #finished with identification
             if st.session_state.picture_seq != []:
                 st.session_state.current_picture = st.session_state.picture_seq.pop()
+                st.session_state.current_picture.write_images_intensity_html_file(st.session_state.configurations)
             st.session_state.progress += 1
             # Ending the session if all pictures have passed
             if st.session_state.progress > st.session_state.number_of_pictures:
@@ -660,8 +658,9 @@ elif st.session_state.keep_identifying:
                     var,
                     picture_slider
                     )
+        # Enable image intensity sliders
         components.html(
-            read_html("images_js.html"),
+            read_html("images_js2.html"),
             height=0,
             width=0,
         )
