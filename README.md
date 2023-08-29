@@ -27,9 +27,30 @@ Or bind a hotkey to an answer by adding <'keystroke> after an option in Options
 [End_questions]
 
 ```
+
 ### Further Configurate:
 In the configurations.ini file other adjustments can be done,
 like image_display and database storage
+
+#### Optional mapping:
+A mapping csv file with following form:
+  ```
+  <name_of_questionnaire>_images_default_values.csv
+  ```
+  ![Alt text](example_images_default_values.csv.png)
+can be created for each image in the directory of the questionnaire this change the image to the values(size,broad_image,location) in the mapping when they are displayed instead of the ones in the configuration.ini file.
+
+#### Explanation of collums:
+**id**: name of image.
+
+**size**: an integer for the image size.
+
+**broad_image**: Name of broad image found in the  "*~data/<name_of_questionnaire>/images/broad_images/*"  directory that will be renderd when the "id image" is displayed.
+
+**location**: Coordinates of the red square that will be drawn on the "broad_image", an input value of this collum has the following form:
+
+int,int,int,int   (which specifies a diagonal of the "red square").
+
 
 ### When Done:
 when images, questions and other adjustments are made run following streamlit command to render webpage:
