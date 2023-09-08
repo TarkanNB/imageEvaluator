@@ -18,33 +18,47 @@ import streamlit.components.v1 as components
 
 ###################################################################
 
-@st.cache_data
-def private_standard_show(image_path, default_size):
-        img = Image.open(image_path)
-        width, height = img.size
-        size = default_size.strip(" ").strip("(").strip(")").strip(" ").split(",")
-        if size == "":
-            st.image(img, output_format='png')
-            return None
-        elif len(size) == 1:
-            image_size = (int(size[0]), int(size[0]))
-        elif len(size) == 2:
-            image_size = (int(size[0]), int(size[1]))
+def private_draw_scale_bar(image_path, bar_lenght, bar_text):
+    if not bar_lenght:
+        return Image.open(image_path)
+    with Image.open(image_path) as img:
+        if img.mode == "I":
+            print("ok")
+            color=2**30
         else:
-            raise Exception("Error: Could not interpret the Default scale in configuration file.")
-        new_img = img.resize(image_size)
-        st.image(new_img, output_format='png')
+            color=(255,255,255)
+        draw = ImageDraw.Draw(img)
+        draw.line((img.size[0]-int(bar_lenght)-5, img.size[1]-5, img.size[0]-5, img.size[1]-5),fill=color)
+        draw.text((img.size[0]-int(bar_lenght), img.size[1]-20), bar_text, fill=color)
+    return img
 
 @st.cache_data
-def private_scaled_show(image_path, scale):
-        img = Image.open(image_path)
-        if scale == 1:
-            st.image(img, output_format='png')
-        else:
-            width, height = img.size
-            image_size = (width * scale, height * scale)
-            new_img = img.resize(image_size)
-            st.image(new_img, output_format='png')
+def private_standard_show(image_path, default_size, scale_bar_length, scale_bar_text):
+    img = private_draw_scale_bar(image_path, scale_bar_length, scale_bar_text)
+    width, height = img.size
+    size = default_size.strip(" ").strip("(").strip(")").strip(" ").split(",")
+    if size == "":
+        st.image(img, output_format='png')
+        return None
+    elif len(size) == 1:
+        image_size = (int(size[0]), int(size[0]))
+    elif len(size) == 2:
+        image_size = (int(size[0]), int(size[1]))
+    else:
+        raise Exception("Error: Could not interpret the Default scale in configuration file.")
+    new_img = img.resize(image_size)
+    st.image(new_img, output_format='png')
+
+@st.cache_data
+def private_scaled_show(image_path, scale, scale_bar_length, scale_bar_text):
+    img = private_draw_scale_bar(image_path, scale_bar_length, scale_bar_text)
+    if scale == 1:
+        st.image(img, output_format='png')
+    else:
+        width, height = img.size
+        image_size = (width * scale, height * scale)
+        new_img = img.resize(image_size)
+        st.image(new_img, output_format='png')
 
 @st.cache_data
 def private_write_images_intensity_html_file(distance_Img_scaledImg, maximum_intensity):
@@ -60,7 +74,6 @@ def private_write_images_intensity_html_file(distance_Img_scaledImg, maximum_int
         images_file.write(f"maximum_sliders = {maximum_intensity}")
         for line in html_file_ending:
             images_file.write(line)
-
 
 class Picture:
     # Grouping of images of the same sample
