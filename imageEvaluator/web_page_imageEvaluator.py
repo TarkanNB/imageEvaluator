@@ -75,6 +75,7 @@ def private_write_images_intensity_html_file(distance_Img_scaledImg, maximum_int
         for line in html_file_ending:
             images_file.write(line)
 
+
 class Picture:
     # Grouping of images of the same sample
     def __init__(self, sample_name, types, extension, seperators, image_directory):
@@ -95,7 +96,9 @@ class Picture:
         template_defaults = {
             'size' : configuration["IMAGE_DISPLAY"]["Default_scale"],
             'broad_image' : None,
-            'location' : None
+            'location' : None,
+            'scale_bar_text' : None,
+            'scale_bar_length': None,
             }
         for img_name in self.full_names:
             if img_name in image_to_default_variable_map:
@@ -106,12 +109,12 @@ class Picture:
     def standard_show(self, the_type):
         # Displays a picture when called which has been scaled to default_size
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
-        private_standard_show(path_to_image, self.defaults['size'])      
+        private_standard_show(path_to_image, self.defaults['size'], self.defaults['scale_bar_length'], self.defaults['scale_bar_text'])      
 
     def scaled_show(self, the_type, scale=1):
         # Displays the image on the webpage with specified scale.
         path_to_image = self.image_directory + '/' + self.full_name_of[the_type]
-        private_scaled_show(path_to_image, scale)
+        private_scaled_show(path_to_image, scale, self.defaults['scale_bar_length'], self.defaults['scale_bar_text'])
     
     def show_broader_image(self):
         # shows the broader image with an square where the images are located
@@ -694,3 +697,4 @@ else:
             st.session_state.startOfSession_picture_seq,
             st.session_state.image_to_id_dictionary,
             st.session_state.evaluators_name)
+
