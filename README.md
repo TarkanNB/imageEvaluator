@@ -1,10 +1,11 @@
 # Image Evaluator
-A tool for generating a webpage for rating images and storing the responses in a database/spreadsheet
+A tool for generating a webpage for rating multiple images and storing the responses in a database/spreadsheet.
 
 ## Usage
 ### Images:
 In the images folder store your images that need to be rated following this namingstructure for each image:
   {sample_name}__{type}.{extension}
+Or change the Image_naming_structure variable of the configuration.ini file of the specified questionnaire.
 ### Questions:
 In the configurations.ini file add your questions under [Questions] and above [End_questions]:
 ```ini
