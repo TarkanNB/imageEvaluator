@@ -10,6 +10,7 @@ import os
 import csv
 import random as rd
 import numpy as np
+import pandas as pd
 import sqlite3
 import configparser
 from PIL import Image, ImageDraw
@@ -100,10 +101,14 @@ class Picture:
             'scale_bar_text' : None,
             'scale_bar_length': None,
             }
-        for img_name in self.full_names:
-            if img_name in image_to_default_variable_map:
-                template_defaults |= image_to_default_variable_map[img_name]
-                break
+        if not image_to_default_variable_map.empty:
+            for img_name in self.full_names:
+                if img_name in image_to_default_variable_map.index:
+                    data_sheet_values_for_image = image_to_default_variable_map.loc[img_name]
+                    for key in template_defaults.keys():
+                        if key in data_sheet_values_for_image:
+                            template_defaults[key]=str(data_sheet_values_for_image[key])
+
         self.defaults = template_defaults
 
     def standard_show(self, the_type):
@@ -191,7 +196,19 @@ def get_questionnaires_options():
     questionnaires = dict()
     options = os.listdir(get_the_path_to_main_directory() + '/data')
     for option in options:
-        questionnaires[option] = get_the_path_to_main_directory() + f"/data/{option}"
+        if option[0] != '.':
+            questionnaire_files = os.listdir(get_the_path_to_main_directory() + '/data/' + option)
+            if not "configuration.ini" in questionnaire_files:
+                #raise Exception(f"No configuration.ini file for {option} questionnaire.")
+                continue
+            if not "images" in questionnaire_files:
+                #raise Exception(f"No images directory for {option} questionnaire.")
+                continue
+            elif not os.listdir(get_the_path_to_main_directory() + '/data/' + option + '/images'):
+                #raise Exception(f"The images directory for {option} questionnaire is empty")
+                continue
+            else:
+                questionnaires[option] = get_the_path_to_main_directory() + f"/data/{option}"
     return questionnaires 
 
 def split_in_name_rest(name, seperator):
@@ -238,7 +255,10 @@ def get_all_picture(configuration, path_to_images_directory=None):
         else:
             sample_name = sample_typeextension[0]
             types = [type_extension[0]]
-
+    # add the last sample to the picture class
+    if types:
+        pictures.append(Picture(sample_name, types, extension, seperators, path_to_images_directory))
+    
     if pictures:
         return pictures
     else:
@@ -283,32 +303,12 @@ def get_questions(configuration):
 
 def get_default_image_value_mapping(path_to_questionnaire):
     # Takes path to <folder_name>_images_default_values.csv file,
-    # and returns a python_dictionary
+    # and returns a panda_dataframe of the file if the file does not exists return empty dataframe
     file_name = path_to_questionnaire.split("/")[-1] + "_images_default_values.csv"
     if not file_name in os.listdir(path_to_questionnaire):
-        return None
-    
-    default_value_map = dict()
+        return pd.DataFrame()
     file = path_to_questionnaire + "/" + path_to_questionnaire.split("/")[-1] + "_images_default_values.csv"
-    is_fst_row = True
-    with open(file) as csvfile:
-        reader = csv.reader(csvfile, dialect='unix')
-        for row in reader:
-            if is_fst_row:
-                image_variables = row[1:]
-                is_fst_row = False
-            else:
-                subdictionary = dict()
-                for i, variable in enumerate(image_variables):
-                    subdictionary[variable] = row[i+1]
-                default_value_map[row[0]] = subdictionary
-    return default_value_map
-
-def update_default_settings(picture_sequence, configuration, image_to_default_map=None):
-    if not image_to_default_map:
-        image_to_default_map = dict()
-    for pict in picture_sequence:
-        pict.set_defaults(image_to_default_map, configuration)
+    return pd.read_csv(file, index_col='image')
 
 def extract_list(string, as_number=False):
     string_list = string.strip("[").strip("[").strip("(").strip(")").split(",")
@@ -406,14 +406,15 @@ def remove_key_label(options_and_hotkey_list):
         options_list.append(option.split("<")[0].strip(" "))
     return options_list
 
-def create_datasheet(picture_class_seq, dict_image_id, evaluator_name, datasheet_name=None):
+def create_datasheet(picture_class_seq, dict_image_id, evaluator_name, path_to_questionnaire, datasheet_base_name):
     if picture_class_seq == []:
         return None
     # make a data sheet in the current folder
-    if not datasheet_name:
-        # create a name for datasheet if none given
-        time = datetime.now()
-        datasheet_name = "plaque_identification_of_brain_tissues_" + time.strftime("%Y-%m-%d_%H-%M-%S") + ".csv"
+    
+    # create a name for datasheet if none given
+    time = datetime.now()
+    datasheet_name = path_to_questionnaire +'/'+ datasheet_base_name +'_'+ time.strftime("%Y-%m-%d_%H-%M-%S") + ".csv"
+    st.write(datasheet_name)
     with open(datasheet_name, 'w', newline='') as datasheet:
         sheet = csv.writer(datasheet, dialect='unix')
         respons_category = [qest.name_in_database for qest in st.session_state.questions_to_ask]
@@ -458,7 +459,7 @@ def get_not_yet_evaluated_pictures(pictures, cursor_db, database, name_of_evalua
             remaining_pictures.append(picture)
     return remaining_pictures
 
-    
+
 #############################################################
 
 ### --- Initialization of session --- ###
@@ -529,14 +530,11 @@ if not st.session_state.name_entered:
                 st.session_state.name_entered = True
                 st.session_state.configurations = temporary_config
                 st.session_state.picture_seq = rd.sample(to_evaluate_pictures, len(to_evaluate_pictures)) # randomize the picture order
-                update_default_settings(
-                    st.session_state.picture_seq,
-                    temporary_config,
-                    get_default_image_value_mapping(path_to_questionnaire)             
-                    ) # initialize image defaults for all picture classes in picture sequence
-                st.session_state.startOfSession_picture_seq = st.session_state.picture_seq
+                st.session_state.default_image_value_mapping = get_default_image_value_mapping(path_to_questionnaire)
+                st.session_state.startOfSession_picture_seq = st.session_state.picture_seq.copy()
                 st.session_state.number_of_pictures = len(to_evaluate_pictures)
                 st.session_state.current_picture = st.session_state.picture_seq.pop()
+                st.session_state.current_picture.set_defaults(st.session_state.default_image_value_mapping, st.session_state.configurations)
                 st.session_state.questions_to_ask = get_questions(st.session_state.configurations)
                 st.session_state.path_to_questionnaire = path_to_questionnaire
                 
@@ -551,6 +549,8 @@ if not st.session_state.name_entered:
                 
                 # write a HTML file to add javascript slider
                 st.session_state.current_picture.write_images_intensity_html_file(st.session_state.configurations)
+                
+                st.session_state.name_of_selected_questionnaire = selected_questionnaire
 
                 st.experimental_rerun() # reload web page (go to #Evaluation_of_current_picture_web_page)
             else:
@@ -631,6 +631,7 @@ elif st.session_state.keep_identifying:
             # change scope to new picture or go to #finished with identification
             if st.session_state.picture_seq != []:
                 st.session_state.current_picture = st.session_state.picture_seq.pop()
+                st.session_state.current_picture.set_defaults(st.session_state.default_image_value_mapping,  st.session_state.configurations)
                 st.session_state.current_picture.write_images_intensity_html_file(st.session_state.configurations)
             st.session_state.progress += 1
             # Ending the session if all pictures have passed
@@ -692,9 +693,15 @@ elif st.session_state.keep_identifying:
 else:
     # finished with identification #
     st.subheader(st.session_state.configurations["TEXT"]["End_Description"])
+    basename_datasheet = st.session_state.configurations["DATABASE"]["Datasheet_name"]
+    if basename_datasheet == "":
+        basename_datasheet = st.session_state.path_to_questionnaire.split('/')[-1]
+
     if st.session_state.configurations["DATABASE"]["Create_datasheet"] == "Enable":
         create_datasheet(
             st.session_state.startOfSession_picture_seq,
             st.session_state.image_to_id_dictionary,
-            st.session_state.evaluators_name)
-
+            st.session_state.evaluators_name,
+            st.session_state.path_to_questionnaire,
+            basename_datasheet
+            )
