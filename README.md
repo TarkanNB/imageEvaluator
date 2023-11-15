@@ -1,17 +1,22 @@
 # Image Evaluator
-A tool for generating a web page to let evaluaters answer question for images. The imageEvaluator stores the responces to in a SQLite and/or comma-separated values (csv) file. Each created questionnaire has it's
+A tool for generating a web page to let evaluaters answer question for images. The imageEvaluator stores the responces to in a SQLite database and/or comma-separated values (csv) file.
 
 ## Getting started
+Each questionnaire in imageEvaluator has it's own directory in the data directory with 
+- a configuration.ini file
+- images directory with images for the questionnaire
+- *(optional)* a `<name_of_questionnaire>_images_default_values.csv` that maps images to specified display values (image mapper)
+- *(optional)* images/broad_images directory for additional images for more information/context for the images specified in the *image mapper*
+  ![Alt text](ImageEvaluator_directory_structure.png)
+  
+  *ImageEvaluator Questionnaire Directory Example Structure*
+
 ### Images:
 In the images folder store your images that need to be rated following this namingstructure for each image:
 {sample_name}__{type}.{extension} or navigate to the imageEvaluator directory and use the mkquest.sh command in the terminal to make a new questionnaire.
 
-![Alt text](ImageEvaluator_directory_structure.png)
-  
-*ImageEvaluator Questionnaire Directory Structure*
-
 ### Questions:
-In the configurations.ini file add your questions under [Questions] and above [End_questions]:
+In the configurations.ini file of the questionnaire add your questions under [Questions] and above [End_questions]:
 ```ini
 [QUESTIONS]
   [Question0]
