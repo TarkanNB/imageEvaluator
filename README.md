@@ -7,6 +7,7 @@ Each questionnaire in imageEvaluator has it's own directory in the data director
 - images directory with images for the questionnaire
 - *(optional)* a `<name_of_questionnaire>_images_default_values.csv` that maps images to specified display values (image mapper)
 - *(optional)* images/broad_images directory for additional images for more information/context for the images specified in the *image mapper*
+    
   ![Alt text](ImageEvaluator_directory_structure.png)
   
   *ImageEvaluator Questionnaire Directory Example Structure*
