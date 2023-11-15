@@ -40,6 +40,7 @@ image_display, database storage, extra text, ...
 ### Optional Image mapping:
 A csv file with mappings to images can be added to the questionnaire directory where images 
 can be maped to values like: size, broad image (for extra context), location, scale bar, ...
+If the image can not be found in the questionnaire the values of the image will be set to the values of the configuration.ini file. 
 
 Make sure the csv file for mapping the images is in the following form:
   
@@ -48,22 +49,20 @@ Make sure the csv file for mapping the images is in the following form:
   - **example of content of the file:**
 
     ![Alt text](example_images_default_values.csv.png)
-  
-can be created for each image in the directory of the questionnaire this change the image to the values(size,broad_image,location) in the mapping when they are displayed instead of the ones in the configuration.ini file.
 
-#### Explanation of collums:
-- **id**: Name of image where the following variables apply.
+  - **Explanation of collums**:
+    - **id**: Name of image where the following variables apply.
 
-- **size**: an integer for the image size.
+    - **size**: an integer for the image size.
 
-- **broad_image**: Name of broad image found in the  "*~/imageEvaluator/data/<name_of_questionnaire>/images/broad_images/*"  directory that will be renderd when the "id images" are displayed.
+    - **broad_image**: Name of broad image found in the  "*~/imageEvaluator/data/<name_of_questionnaire>/images/broad_images/*"    directory that will be renderd when the "id images" are displayed.
 
-- **location**: Coordinates of the red square that will be drawn on the "broad_image", an input value of  this collum has the following form:
+    - **location**: Coordinates of the red square that will be drawn on the "broad_image", an input value of  this collum has the following form:
 int,int,int,int   (which specifies a diagonal of the "red square").
 
-- **scale_bar_text**: text of the scale bar
+    - **scale_bar_text**: text of the scale bar
 
-- **scale_bar_length**: the length of the desired scale bar in pixels on the original image.
+    - **scale_bar_length**: the length of the desired scale bar in pixels on the original image.
   
   
   
