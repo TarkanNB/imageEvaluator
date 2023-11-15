@@ -11,7 +11,7 @@ In the images folder store your images that need to be rated following this nami
 *ImageEvaluator Questionnaire Directory Structure*
 
 ### Questions:
-In the configurations.ini file add your questions under `[Questions]` and above `[End_questions]`:
+In the configurations.ini file add your questions under [Questions] and above [End_questions]:
 ```ini
 [QUESTIONS]
   [Question0]
@@ -37,15 +37,17 @@ Or bind a hotkey to an answer by adding <'keystroke> after an option in Options
 In the configurations.ini file other adjustments can be done like:
 image_display, database storage, extra text, ...
 
-### Optional mapping:
-A csv file with mappings can be added to the questionnaire directory where images 
-A mapping csv file with following form:
+### Optional Image mapping:
+A csv file with mappings to images can be added to the questionnaire directory where images 
+can be maped to values like: size, broad image (for extra context), location, scale bar, ...
+
+Make sure the csv file for mapping the images is in the following form:
   
-  `
-  <name_of_questionnaire>_images_default_values.csv
-  `
+  - **name of the file:** `<name_of_questionnaire>_images_default_values.csv`
   
-  ![Alt text](example_images_default_values.csv.png)
+  - **example of content of the file:**
+
+    ![Alt text](example_images_default_values.csv.png)
   
 can be created for each image in the directory of the questionnaire this change the image to the values(size,broad_image,location) in the mapping when they are displayed instead of the ones in the configuration.ini file.
 
